@@ -15,15 +15,3 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local parxe = {
-  _NAME     = "parxe",
-  _VERSION  = "0.1",
-  config    = require "parxe.config".init(),
-  export    = require "parxe.export",
-  --
-  apply     = require "parxe.apply", -- ignore returned values
-  filter    = require "parxe.filter",
-  map       = require "parxe.map",
-  reduce    = require "parxe.reduce",
-}
-return parxe

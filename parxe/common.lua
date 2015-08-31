@@ -49,6 +49,7 @@ local function serialize(obj, f)
 end
 
 local function take_slice(obj, a, b)
+  if a == 1 and b == #obj then return obj end
   local object_slice
   if type(obj):find("^matrix") then
     object_slice = obj[{{a,b}}]:clone()

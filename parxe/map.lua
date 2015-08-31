@@ -17,28 +17,68 @@
 ]]
 local config = require "parxe.config"
 local future = require "parxe.future"
+local common = require "parxe.common"
 
-local matrix_join = function(tbl) return matrix.join(1, tbl) end
+local take_slice = common.take_slice
+
+local px_slice_map_table = function(slice_object, map_func, ...)
+  local result = {}
+  for i=1,#slice_object do result[i] = map_func(slice_object[i], ...) end
+  return result
+end
+
+local px_slice_map_matrix = function(slice_object, map_func, ...)
+  local result = {}
+  for i=1,#slice_object do
+    local m = map_func(slice_object[i], ...)
+    result[i] = m:rewrap(1, table.unpack(m:dim()))
+  end
+  return matrix.join(result)
+end
+
+local px_slice_map_bunch = function(slice_object, map_func, ...)
+  return map_func(slice_object, ...)
+end
 
 -- object needs to be iterable using # and [] operators
-local px_map = function(object, map_func, ...)
+local private_map = function(object, bunch, map_func, ...)
   if class.is_a(object, future) then
     error("Not implemented for a future as input")
   else
     local min_task_len = config.min_task_len()
     local engine   = config.engine()
-    local map_args = table.pack(...)
     local futures  = {}
     local N = #object
     local M = engine:get_max_tasks() or N
     local K = math.max(math.ceil(N/M), min_task_len)
+    local slice_map
+    if bunch then
+      slice_map = bunch
+    else
+      slice_map = type(object):find("^matrix") and px_slice_map_matrix or px_slice_map_table
+    end
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end
-      futures[i] = engine:map(object, a, b, map_func, map_args)
+      futures[i] = engine:execute(slice_map,
+                                  take_slice(object, a, b),
+                                  map_func,
+                                  ...)
     end
-    return future.all(futures, type(object):find("^matrix") and join or nil)
+    return future.all(futures)
   end
 end
 
-return px_map
+local px_map = function(object, ...)
+  return private_map(object, false, ...)
+end
+
+local px_map_bunch = function(object, ...)
+  return private_map(object, true, ...)
+end
+
+return setmetatable(
+  { bunch = px_map_bunch,
+    one = px_map, },
+  { __call = px_map, }
+)

@@ -134,17 +134,10 @@ function engine:destructor()
   util.wait()
 end
 
-function engine_methods:map(object, a, b, map_func, map_args)
-  local object_slice = common.take_slice(object, a, b)
-  local map_slice_func = function(object_slice, ...)
-    local result = {}
-    for i=1,#object_slice do
-      result[i] = map_func(object_slice[i], ...)
-    end
-    return result
-  end
+function engine_methods:execute(func, ...)
+  local args = table.pack(...)
   local task_id = common.next_task_id()
-  local f = future(map_wait, map_ready, map_abort, map_post_process
+  local f = future(map_wait, map_ready, map_abort, map_post_process)
 end
 
 function engine_methods:wait()
