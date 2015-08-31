@@ -20,10 +20,14 @@ local config = require "parxe.config"
 local lock   = require "parxe.lock"
 local pipe   = require "parxe.pipe"
 
+local duplicate = iterator.duplicate
+local range = iterator.range
+
 ---------------------------------------------------------------------------
 
 local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
-local API,pipes = {},{}
+local scheduler
+local pipes = {},{}
 local which,pid
 do
   local locks = {}
@@ -61,24 +65,33 @@ do
     os_exit(0) -- exist doesn't call it
   end
   
-  local function build_proc_API(stream, lock)
+  local function build_scheduler(pipes, locks)
     local in_queue,out_queue = {},{}
-    local idle = true
+    local idle = duplicate(true):take(#pipes):table()
     --
     local function execute_next()
-      if idle and #in_queue > 0 then
-        serialize(table.remove(in_queue, 1), stream)
-        idle = false
+      local all_idle = true
+      for i=1,#idle do
+        if idle[i] and #in_queue > 0 then
+          serialize(table.remove(in_queue, 1), pipes[i])
+          idle[i] = false
+          all_idle = false
+        end
       end
+      return all_idle
     end
     local function read_next_result()
-      local ready = lock:check()
-      if ready then
-        lock:remove()
-        table.insert(out_queue, deserialize(stream))
-        idle = true
+      local any_ready = false
+      for i=1,#locks do
+        local lock  = locks[i]
+        local ready = lock:check()
+        if ready then
+          lock:remove()
+          table.insert(out_queue, deserialize(pipes[i]))
+          any_ready,idle[i] = true,true
+        end
       end
-      return ready
+      return any_ready
     end
     --
     local function check_result()
@@ -99,8 +112,8 @@ do
     end
     local function empty()
       local ready = read_next_result()
-      execute_next()
-      return not ready and idle and #in_queue == 0 and #out_queue == 0
+      local all_idle = execute_next()
+      return not ready and all_idle and #in_queue == 0 and #out_queue == 0
     end
     return push_task,check_result,pop_result,empty
   end
@@ -109,13 +122,12 @@ do
   if which > 1 then
     child_process(which - 1, pid)
   else
-    for i=1,num_cores do
-      local stream = pipes[i]:set_as_parent()
-      local push,check,pop,empty=build_proc_API(stream, locks[i])
-      API[i] = { push_task = push,
-                 check_result = check,
-                 pop_result = pop,
-                 empty = empty }
+    for i=1,num_cores do pipes[i]:set_as_parent() end
+    local push,check,pop,empty=build_scheduler(pipes, locks)
+    scheduler = { push_task = push,
+                  check_result = check,
+                  pop_result = pop,
+                  empty = empty }
     end
   end
 end
@@ -123,6 +135,9 @@ end
 ---------------------------------------------------------------------------
 
 local pending_futures = {}
+
+
+---------------------------------------------------------------------------
 
 local engine,engine_methods = class("engine")
 
@@ -137,7 +152,10 @@ end
 function engine_methods:execute(func, ...)
   local args = table.pack(...)
   local task_id = common.next_task_id()
-  local f = future(map_wait, map_ready, map_abort, map_post_process)
+  local f = future(wait, ready, abort)
+  pending_futures[task_id] = f
+  scheduler.push_task(func, args, task_id)
+  return f
 end
 
 function engine_methods:wait()
