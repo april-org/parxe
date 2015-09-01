@@ -20,6 +20,7 @@ local future = require "parxe.future"
 local common = require "parxe.common"
 
 local take_slice = common.take_slice
+local px_matrix_join = common.matrix_join
 
 local px_slice_map_table = function(slice_object, map_func, ...)
   local result = {}
@@ -33,7 +34,7 @@ local px_slice_map_matrix = function(slice_object, map_func, ...)
     local m = map_func(slice_object[i], ...)
     result[i] = m:rewrap(1, table.unpack(m:dim()))
   end
-  return matrix.join(result)
+  return px_matrix_join(1, result)
 end
 
 local px_slice_map_bunch = function(slice_object, map_func, ...)
@@ -53,7 +54,7 @@ local private_map = function(object, bunch, map_func, ...)
     local K = math.max(math.ceil(N/M), min_task_len)
     local slice_map
     if bunch then
-      slice_map = bunch
+      slice_map = px_slice_map_bunch
     else
       slice_map = type(object):find("^matrix") and px_slice_map_matrix or px_slice_map_table
     end
@@ -80,5 +81,5 @@ end
 return setmetatable(
   { bunch = px_map_bunch,
     one = px_map, },
-  { __call = px_map, }
+  { __call = function(self,...) return px_map(...) end, }
 )

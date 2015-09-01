@@ -59,10 +59,16 @@ local function take_slice(obj, a, b)
   return object_slice
 end
 
+local function matrix_join(n, tbl)
+  if #tbl == 1 then return tbl[1] end
+  return matrix.join(n, tbl)
+end
+
 return {
   deserialize = deserialize,
   gettime = gettime,
   next_task_id = next_task_id,
   serialize = serialize,
   take_slice = take_slice,
+  matrix_join = matrix_join,
 }

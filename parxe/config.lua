@@ -25,7 +25,7 @@ local tmp = "/tmp"
 -- interface table to retrieve and update config variables
 local api
 api = {
-  init = function() engine = require "parxe.engines.fork" return api end,
+  init = function() engine = require "parxe.engines.seq" return api end,
   engine = function() return engine end,
   exports = function() assert(os.execute("mkdir -p "..exports)) return exports end,
   min_task_len = function() return min_task_len end,

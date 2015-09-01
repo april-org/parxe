@@ -16,19 +16,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 local common = require "parxe.common"
-local future,future_methods = class("future")
+local future,future_methods = class("parxe.future")
 
 local gettime = common.gettime
+local px_matrix_join = common.matrix_join
 
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 
-local aborted_function = function() error("aborted future execution") end
+local function aborted_function() error("aborted future execution") end
 
 local function identity_function(self, ...) return ... end
 
 -------------------------------------------------------------------------
 
-function future.constructor(self, wait_function, ready_function,
+function future:constructor(wait_function, ready_function,
                             abort_function, post_process)
   self._wait_  = wait_function
   self._ready_ = ready_function
@@ -38,7 +39,7 @@ function future.constructor(self, wait_function, ready_function,
   assert(self._ready_, "Not implemented ready function")
 end
 
-function future_methods.wait(self, timeout, sleep_step)
+function future_methods:wait(timeout, sleep_step)
   if not timeout or timeout == math.huge then
     self._result_ = self:_post_process_(self:_wait_())
   else
@@ -52,16 +53,16 @@ function future_methods.wait(self, timeout, sleep_step)
   end
 end
 
-function future_methods.get(self)
+function future_methods:get()
   if not self._result_ then self:wait() end
   return self._result_
 end
 
-function future_methods.ready(self)
+function future_methods:ready()
   return self._result_~=nil or self:_ready_()
 end
 
-function future_methods.abort(self)
+function future_methods:abort()
   assert(self._abort_, "Abort function not available for this future object")
   self:_abort()
   self._aborted_ = true
@@ -73,13 +74,20 @@ end
 -------------------------------------------------------------------------
 
 local all_wait_function = function(self)
+  local all_matrix = true
   local result = {}
   for i,f in ipairs(self.data) do
-    local aux = f:wait()
-    local values = aux.values
-    for i,key in ipairs(aux.keys) do result[key] = values[i] end
+    local values = f:get()
+    if type(values):find("^matrix") then
+      result[i] = values
+    else
+      all_matrix = false
+      for _,v in ipairs(values) do
+        table.insert(result, v)
+      end
+    end
   end
-  return result
+  if all_matrix then return px_matrix_join(1, result) else return result end
 end
 
 local all_ready_function = function(self)
@@ -93,10 +101,11 @@ local all_abort_function = function(self)
   for i,f in ipairs(self.data) do f:abort() end
 end
 
-function future.all(self, tbl, post_process)
+function future.all(tbl, post_process)
   local f = future(all_wait_function, all_ready_function,
                    all_abort_function, post_process)
   f.data = tbl
+  return f
 end
 
 -------------------------------------------------------------------------

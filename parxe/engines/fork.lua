@@ -20,9 +20,6 @@ local config = require "parxe.config"
 local lock   = require "parxe.lock"
 local pipe   = require "parxe.pipe"
 
-local duplicate = iterator.duplicate
-local range = iterator.range
-
 ---------------------------------------------------------------------------
 
 local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
@@ -67,7 +64,7 @@ do
   
   local function build_scheduler(pipes, locks)
     local in_queue,out_queue = {},{}
-    local idle = duplicate(true):take(#pipes):table()
+    local idle = {} for i=1,#pipes do idle[i] = true end
     --
     local function execute_next()
       local all_idle = true
@@ -139,17 +136,17 @@ local pending_futures = {}
 
 ---------------------------------------------------------------------------
 
-local engine,engine_methods = class("engine")
+local fork,fork_methods = class("parxe.engine.fork")
 
-function engine:constructor()
+function fork:constructor()
 end
 
-function engine:destructor()
+function fork:destructor()
   for i=1,num_cores do pipes[i]:close() end
   util.wait()
 end
 
-function engine_methods:execute(func, ...)
+function fork_methods:execute(func, ...)
   local args = table.pack(...)
   local task_id = common.next_task_id()
   local f = future(wait, ready, abort)
@@ -158,7 +155,7 @@ function engine_methods:execute(func, ...)
   return f
 end
 
-function engine_methods:wait()
+function fork_methods:wait()
   repeat
     for task_id,f in pairs(pending_futures) do
       f:wait()
@@ -167,8 +164,8 @@ function engine_methods:wait()
   until not next(pending_futures)
 end
 
-function engine_methods:get_max_tasks() return num_cores end
+function fork_methods:get_max_tasks() return num_cores end
 
-local singleton = engine()
-class.extend_metamethod(engine, "__call", function() return singleton end)
+local singleton = fork()
+class.extend_metamethod(fork, "__call", function() return singleton end)
 return singleton

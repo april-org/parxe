@@ -15,7 +15,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local pipe,pipe_methods = class("pipe")
+local pipe,pipe_methods = class("parxe.pipe")
 
 function pipe:constructor()
   self.p1 = { util.pipe() }

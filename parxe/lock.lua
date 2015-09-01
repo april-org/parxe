@@ -15,7 +15,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local lock,lock_methods = class("lock")
+local lock,lock_methods = class("parxe.lock")
 
 function lock:constructor()
   local name = os.tmpname()
