@@ -23,7 +23,7 @@ local f = px.map(iterator.range(4):table(), function(x) return 2*x end)
 local r = f:get()
 pprint(r)
 
-local m = matrix(1024,20):linspace()
+local m = matrix(2^14,20):linspace()
 
 local f = px.map(m, function(x) return 2*x end)
 local r = f:get()

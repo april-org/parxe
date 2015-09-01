@@ -37,6 +37,8 @@ end
 
 function seq_methods:wait() end
 
+function seq_methods:send() end
+
 function seq_methods:get_max_tasks() return 1 end
 
 local singleton = seq()

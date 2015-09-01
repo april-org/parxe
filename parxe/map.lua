@@ -19,8 +19,10 @@ local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"
 
-local table_unpack = table.unpack
-local take_slice = common.take_slice
+local table_unpack   = table.unpack
+local print          = print
+
+local take_slice     = common.take_slice
 local px_matrix_join = common.matrix_join
 
 local px_slice_map_table = function(slice_object, map_func, ...)
@@ -67,6 +69,7 @@ local private_map = function(object, bunch, map_func, ...)
                                   map_func,
                                   ...)
     end
+    engine:send()
     return future.all(futures)
   end
 end

@@ -42,7 +42,7 @@ function lock_methods:remove()
   os_remove(self.name)
 end
 
-function lock_methods:make(name)
+function lock_methods:make()
   assert( io_open(self.name, "w") ):close()
 end
 

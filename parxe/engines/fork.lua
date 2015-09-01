@@ -33,7 +33,7 @@ do
   local serialize   = common.serialize
   
   for i=1,num_cores do pipes[i],locks[i] = pipe(),lock() end
-
+  
   local function run_worker(stream, lock)
     -- remove from global table sensible functions
     os,io = nil,nil
@@ -95,7 +95,7 @@ do
     local function check_result()
       local ready = read_next_result()
       execute_next()
-      return ready
+      return #out_queue>0
     end
     local function push_task(id, func, args)
       table.insert(in_queue, {func=func, args=args, id=id})
@@ -105,7 +105,6 @@ do
     local function pop_result()
       read_next_result()
       execute_next()
-      assert(#out_queue > 0, "Queue underflow")
       return table.remove(out_queue, 1)
     end
     local function empty()
@@ -165,11 +164,15 @@ function fork_methods:wait()
   until not next(pending_futures)
 end
 
+function fork_methods:send()
+  
+end
+
 function fork_methods:get_max_tasks() return num_cores end
 
 function check_worker()
   while scheduler.check_result() do
-    local r = scheduler.pop_result()
+    local r = assert( scheduler.pop_result() )
     pending_futures[r.id]._result_ = r.result
   end
 end
