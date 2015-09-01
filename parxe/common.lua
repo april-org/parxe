@@ -18,14 +18,13 @@
 local DEFAULT_BLOCK_SIZE = 4096
 
 local function deserialize(f)
-  print("deserialize")
   local line = f:read("*l") if not line then return end
   local n = tonumber(line)
-  print("line", line)
   return util.deserialize{
-    read=function()
+    read=function(_,m)
       if n > 0 then
-        local b = math.min(n, DEFAULT_BLOCK_SIZE)
+        m = math.min(n, m)
+        local b = math.min(m, DEFAULT_BLOCK_SIZE)
         n = n - b
         return assert( f:read(b) )
       end

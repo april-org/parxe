@@ -51,21 +51,24 @@ function future_methods:get()
 end
 
 function future_methods:ready()
-  return self._result_~=nil
+  self:_do_work_()
+  return self._result_ ~= nil
 end
 
 function future_methods:abort()
   assert(self._abort_, "Abort function not available for this future object")
   self._aborted_ = true
-  self._do_work_  = aborted_function
+  self._do_work_ = aborted_function
 end
 
 -------------------------------------------------------------------------
 
 local all_do_work = function(self)
+  local all_ready = true
   for i,f in ipairs(self.data) do
-    if not f:ready() then return false end
+    if not f:ready() then all_ready = false end
   end
+  if not all_ready then return false end
   -- the code below is executed once all futures are ready
   local all_matrix = true
   local result = {}

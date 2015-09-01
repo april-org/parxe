@@ -19,6 +19,7 @@ local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"
 
+local table_unpack = table.unpack
 local take_slice = common.take_slice
 local px_matrix_join = common.matrix_join
 
@@ -32,7 +33,7 @@ local px_slice_map_matrix = function(slice_object, map_func, ...)
   local result = {}
   for i=1,#slice_object do
     local m = map_func(slice_object[i], ...)
-    result[i] = m:rewrap(1, table.unpack(m:dim()))
+    result[i] = m:rewrap(1, table_unpack(m:dim()))
   end
   return px_matrix_join(1, result)
 end

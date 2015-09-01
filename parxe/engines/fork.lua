@@ -40,11 +40,11 @@ do
     package.loaded["os"] = nil
     package.loaded["io"] = nil
     while true do
-      local task = deserialize(stream) if not command then break end
+      local task = deserialize(stream) if not task then break end
       local func, args, id = task.func, task.args, task.id
       local result = func(table.unpack(args))
       lock:make() -- mark as job done
-      serialize(stream, { result=result, id=id })
+      serialize({ result=result, id=id }, stream)
     end
   end
 
@@ -97,7 +97,7 @@ do
       execute_next()
       return ready
     end
-    local function push_task(func, args, id)
+    local function push_task(id, func, args)
       table.insert(in_queue, {func=func, args=args, id=id})
       read_next_result()
       execute_next()
@@ -152,7 +152,7 @@ function fork_methods:execute(func, ...)
   local f = future(check_worker)
   f.task_id = task_id
   pending_futures[task_id] = f
-  scheduler.push_task(func, args, task_id)
+  scheduler.push_task(task_id, func, args)
   return f
 end
 
@@ -169,7 +169,7 @@ function fork_methods:get_max_tasks() return num_cores end
 
 function check_worker()
   while scheduler.check_result() do
-    local r = pop_result()
+    local r = scheduler.pop_result()
     pending_futures[r.id]._result_ = r.result
   end
 end
