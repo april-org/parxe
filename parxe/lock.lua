@@ -17,23 +17,31 @@
 ]]
 local lock,lock_methods = class("parxe.lock")
 
+local io_open    = io.open
+local os_remove  = os.remove
+local os_tmpname = os.tmpname
+
 function lock:constructor()
-  local name = os.tmpname()
-  os.remove(name)
-  self.name = name .. ".lock"
+  local tmpname = os_tmpname()
+  self.tmpname  = tmpname
+  self.name     = tmpname .. ".lock"
+end
+
+function lock:destructor()
+  os_remove(self.tmpname)
+  os_remove(self.name)
 end
 
 function lock_methods:check()
-  local f = assert( io.open(self.name, "r") )
+  local f = io.open(self.name, "r")
   if f then f:close() end
   return f ~= nil
 end
 
 function lock_methods:remove()
-  os.remove(self.name)
+  os_remove(self.name)
 end
 
-local io_open = io.open
 function lock_methods:make(name)
   assert( io_open(self.name, "w") ):close()
 end

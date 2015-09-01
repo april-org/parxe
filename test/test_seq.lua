@@ -19,11 +19,11 @@ local px     = require "parxe"
 local engine = require "parxe.engines.seq"
 px.config.set_engine(engine) -- not necessary
 
-local f = px.map({1,2,3}, function(x) return 2*x end)
+local f = px.map(iterator.range(1024):table(), function(x) return 2*x end)
 local r = f:get()
-april_list(r)
+pprint(r)
 
-local m = matrix(10,20):linspace()
+local m = matrix(1024,20):linspace()
 
 local f = px.map(m, function(x) return 2*x end)
 local r = f:get()

@@ -18,8 +18,10 @@
 local DEFAULT_BLOCK_SIZE = 4096
 
 local function deserialize(f)
+  print("deserialize")
   local line = f:read("*l") if not line then return end
   local n = tonumber(line)
+  print("line", line)
   return util.deserialize{
     read=function()
       if n > 0 then
@@ -46,6 +48,7 @@ local function serialize(obj, f)
   assert( f:write(#str) )
   assert( f:write("\n") )
   assert( f:write(str) )
+  f:flush()
 end
 
 local function take_slice(obj, a, b)
@@ -54,7 +57,7 @@ local function take_slice(obj, a, b)
   if type(obj):find("^matrix") then
     object_slice = obj[{{a,b}}]:clone()
   else
-    object_slice={} for i=a,b do object_slice[#object_slice+1] = object[i] end
+    object_slice={} for i=a,b do object_slice[#object_slice+1] = obj[i] end
   end
   return object_slice
 end

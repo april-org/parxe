@@ -17,6 +17,7 @@
 ]]
 local common = require "parxe.common"
 local config = require "parxe.config"
+local future = require "parxe.future"
 local lock   = require "parxe.lock"
 local pipe   = require "parxe.pipe"
 
@@ -24,7 +25,7 @@ local pipe   = require "parxe.pipe"
 
 local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
 local scheduler
-local pipes = {},{}
+local pipes = {}
 local which,pid
 do
   local locks = {}
@@ -125,14 +126,13 @@ do
                   check_result = check,
                   pop_result = pop,
                   empty = empty }
-    end
   end
 end
 
 ---------------------------------------------------------------------------
 
+local check_worker
 local pending_futures = {}
-
 
 ---------------------------------------------------------------------------
 
@@ -149,7 +149,8 @@ end
 function fork_methods:execute(func, ...)
   local args = table.pack(...)
   local task_id = common.next_task_id()
-  local f = future(wait, ready, abort)
+  local f = future(check_worker)
+  f.task_id = task_id
   pending_futures[task_id] = f
   scheduler.push_task(func, args, task_id)
   return f
@@ -165,6 +166,15 @@ function fork_methods:wait()
 end
 
 function fork_methods:get_max_tasks() return num_cores end
+
+function check_worker()
+  while scheduler.check_result() do
+    local r = pop_result()
+    pending_futures[r.id]._result_ = r.result
+  end
+end
+
+----------------------------------------------------------------------------
 
 local singleton = fork()
 class.extend_metamethod(fork, "__call", function() return singleton end)

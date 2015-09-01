@@ -35,6 +35,10 @@ function pipe_methods:set_as_child()
 end
 
 function pipe_methods:set_as_parent()
+  self.IN  = self.p1[1] self.p1[2]:close()
+  self.OUT = self.p2[2] self.p2[1]:close()
+  self.p1  = nil
+  self.p2  = nil
   return self
 end
 
@@ -48,5 +52,7 @@ end
 function pipe_methods:write(...) return self.OUT:write(...) end
 
 function pipe_methods:read(...) return self.IN:read(...) end
+
+function pipe_methods:flush() self.OUT:flush() end
 
 return pipe

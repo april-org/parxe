@@ -21,11 +21,6 @@ local future = require "parxe.future"
 
 ---------------------------------------------------------------------------
 
-local function wait(self) return self.data end
-local function ready(self) return true end
-
----------------------------------------------------------------------------
-
 local seq,seq_methods = class("parxe.engines.seq")
 
 function seq:constructor()
@@ -35,8 +30,8 @@ function seq:destructor()
 end
 
 function seq_methods:execute(func, ...)
-  local f = future(wait, ready)
-  f.data = func(...)
+  local f = future()
+  f._result_ = func(...)
   return f
 end
 
