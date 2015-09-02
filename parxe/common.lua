@@ -15,7 +15,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local DEFAULT_BLOCK_SIZE = 2^25
+local config = require "parxe.config"
 
 -----------------------------------------------------------------------------
 
@@ -33,7 +33,7 @@ local function deserialize(f)
     read=function(_,m)
       if n > 0 then
         m = math.min(n, m)
-        local b = math.min(m, DEFAULT_BLOCK_SIZE)
+        local b = math.min(m, config.block_size())
         n = n - b
         return assert( f:read(b) )
       end
@@ -58,8 +58,9 @@ local function make_serializer(obj, f)
       local n   = #str
       assert( f:write(n) )
       assert( f:write("\n") )
-      for i=1,n,DEFAULT_BLOCK_SIZE do
-        assert( f:write(str:sub(i,math.min(n,i+DEFAULT_BLOCK_SIZE-1))) )
+      local bsize = config.block_size()
+      for i=1,n,bsize do
+        assert( f:write(str:sub(i,math.min(n,i+config.block_size()-1))) )
         f:flush()
         coroutine.yield()
       end

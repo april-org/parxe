@@ -186,7 +186,7 @@ function check_worker()
   repeat until scheduler.do_serialization()
   while scheduler.check_result() do
     local r = assert( scheduler.pop_result() )
-    pending_futures[r.id]._result_ = r.result
+    pending_futures[r.id]._result_ = r.result or true
     if r.err then fprintf(io.stderr, r.err) end
   end
 end

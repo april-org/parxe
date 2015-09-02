@@ -22,7 +22,6 @@ local parxe = {
   config    = require "parxe.config".init(),
   export    = require "parxe.export",
   --
-  apply     = require "parxe.apply", -- ignore returned values
   filter    = require "parxe.filter",
   map       = require "parxe.map",
   reduce    = require "parxe.reduce",
