@@ -17,6 +17,15 @@
 ]]
 local DEFAULT_BLOCK_SIZE = 2^25
 
+-----------------------------------------------------------------------------
+
+local range_object,range_object_methods = class("parxe.range_object")
+function range_object:constructor(a,b) self.a = a self.b = b end
+function range_object_methods:ctor_name() return 'class.find("parxe.range_object")' end
+function range_object_methods:ctor_params() return self.a,self.b end
+
+-----------------------------------------------------------------------------
+
 local function deserialize(f)
   local line = f:read("*l") if not line then return end
   local n = tonumber(line)
@@ -60,6 +69,7 @@ local function make_serializer(obj, f)
 end
 
 local function take_slice(obj, a, b)
+  if type(obj) == "number" then return range_object(a,b) end
   if a == 1 and b == #obj then return obj end
   local object_slice
   if type(obj):find("^matrix") then
@@ -78,8 +88,9 @@ end
 return {
   deserialize = deserialize,
   gettime = gettime,
-  next_task_id = next_task_id,
   make_serializer = make_serializer,
-  take_slice = take_slice,
   matrix_join = matrix_join,
+  next_task_id = next_task_id,
+  range_object = range_object,
+  take_slice = take_slice,
 }

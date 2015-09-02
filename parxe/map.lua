@@ -22,8 +22,9 @@ local common = require "parxe.common"
 local table_unpack   = table.unpack
 local print          = print
 
-local take_slice     = common.take_slice
 local px_matrix_join = common.matrix_join
+local range_object   = common.range_object
+local take_slice     = common.take_slice
 
 local px_slice_map_table = function(slice_object, map_func, ...)
   local result = {}
@@ -34,27 +35,36 @@ end
 local type = type
 local px_slice_map_matrix = function(slice_object, map_func, ...)
   local all_matrix = true
-  local result = {}
-  for i=1,#slice_object do
-    local m = map_func(slice_object[i], ...)
+  local function process(obj, ...)
+    local m = map_func(obj, ...)
     local tt = type(m)
     if tt:find("^matrix") then
       m = m:rewrap(1, table_unpack(m:dim()))
     elseif tt == "number" then
-      result[i] = matrix(1,1,{m})
+      m = matrix(1,1,{m})
     else
-      result[i] = m
       all_matrix = false
     end
+    return m
+  end
+  local result = {}
+  if class.is_a(slice_object, range_object) then
+    for i=slice_object.a,slice_object.b do result[i] = process(i, ...) end
+  else
+    for i=1,#slice_object do result[i] = process(slice_object[i], ...) end
   end
   return all_matrix and px_matrix_join(1, result) or result
 end
 
 local px_slice_map_bunch = function(slice_object, map_func, ...)
-  return map_func(slice_object, ...)
+  if class.is_a(slice_object, range_object) then
+    return map_func(slice_object.a, slice_object.b, ...)
+  else
+    return map_func(slice_object, ...)
+  end
 end
 
--- object needs to be iterable using # and [] operators
+-- object needs should be a number or an iterable using # and [] operators
 local private_map = function(object, bunch, map_func, ...)
   if class.is_a(object, future) then
     error("Not implemented for a future as input")
@@ -62,7 +72,7 @@ local private_map = function(object, bunch, map_func, ...)
     local min_task_len = config.min_task_len()
     local engine   = config.engine()
     local futures  = {}
-    local N = #object
+    local N = (type(object)=="number" and object) or #object
     local M = engine:get_max_tasks() or N
     local K = math.max(math.ceil(N/M), min_task_len)
     local slice_map
