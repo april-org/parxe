@@ -16,7 +16,10 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 local common = require "parxe.common"
+local config = require "parxe.config"
 local future,future_methods = class("parxe.future")
+
+local DEFAULT_WAIT_STEP = config.wait_step()
 
 local gettime = common.gettime
 local px_matrix_join = common.matrix_join
@@ -36,7 +39,7 @@ end
 function future_methods:wait(timeout, sleep_step)
   self:_do_work_()
   timeout = timeout or math.huge
-  sleep_step = sleep_step or 0.1
+  sleep_step = sleep_step or DEFAULT_WAIT_STEP
   local util_sleep = util.sleep
   local t0_sec = gettime()
   while not self:ready() and elapsed_time(t0_sec) < timeout do

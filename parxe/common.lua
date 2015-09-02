@@ -15,7 +15,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local DEFAULT_BLOCK_SIZE = 4096
+local DEFAULT_BLOCK_SIZE = 2^25
 
 local function deserialize(f)
   local line = f:read("*l") if not line then return end
@@ -42,12 +42,21 @@ do
   task_id = 0 function next_task_id() task_id = task_id + 1 return task_id end
 end
 
-local function serialize(obj, f)
-  local str = util.serialize(obj)
-  assert( f:write(#str) )
-  assert( f:write("\n") )
-  assert( f:write(str) )
-  f:flush()
+local function make_serializer(obj, f)
+  return coroutine.wrap(
+    function()
+      local str = util.serialize(obj)
+      local n   = #str
+      assert( f:write(n) )
+      assert( f:write("\n") )
+      for i=1,n,DEFAULT_BLOCK_SIZE do
+        assert( f:write(str:sub(i,math.min(n,i+DEFAULT_BLOCK_SIZE-1))) )
+        f:flush()
+        coroutine.yield()
+      end
+      return true
+    end
+  )
 end
 
 local function take_slice(obj, a, b)
@@ -70,7 +79,7 @@ return {
   deserialize = deserialize,
   gettime = gettime,
   next_task_id = next_task_id,
-  serialize = serialize,
+  make_serializer = make_serializer,
   take_slice = take_slice,
   matrix_join = matrix_join,
 }

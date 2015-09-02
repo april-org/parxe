@@ -30,21 +30,22 @@ local which,pid
 do
   local locks = {}
   local deserialize = common.deserialize
-  local serialize   = common.serialize
+  local make_serializer = common.make_serializer
   
   for i=1,num_cores do pipes[i],locks[i] = pipe(),lock() end
   
   local function run_worker(stream, lock)
     -- remove from global table sensible functions
-    os,io = nil,nil
-    package.loaded["os"] = nil
-    package.loaded["io"] = nil
     while true do
       local task = deserialize(stream) if not task then break end
       local func, args, id = task.func, task.args, task.id
-      local result = func(table.unpack(args))
+      -- FIXME: MEMORY LEAK POSSIBLE WHEN ERROR IS PRODUCED
+      local ok,result = xpcall(func,debug.traceback,table.unpack(args))
+      local err = nil
+      if not ok then err,result=result,{} end
       lock:make() -- mark as job done
-      serialize({ result=result, id=id }, stream)
+      local serializer = make_serializer({ result=result, id=id, err=err }, stream)
+      repeat until serializer()
     end
   end
 
@@ -66,12 +67,14 @@ do
   local function build_scheduler(pipes, locks)
     local in_queue,out_queue = {},{}
     local idle = {} for i=1,#pipes do idle[i] = true end
+    local serializer_coroutines = {}
     --
     local function execute_next()
       local all_idle = true
       for i=1,#idle do
         if idle[i] and #in_queue > 0 then
-          serialize(table.remove(in_queue, 1), pipes[i])
+          local serializer = make_serializer(table.remove(in_queue, 1), pipes[i])
+          table.insert(serializer_coroutines, serializer)
           idle[i] = false
           all_idle = false
         end
@@ -112,7 +115,15 @@ do
       local all_idle = execute_next()
       return not ready and all_idle and #in_queue == 0 and #out_queue == 0
     end
-    return push_task,check_result,pop_result,empty
+    local function do_serialization()
+      local new_list = {}
+      for _,serializer in ipairs(serializer_coroutines) do
+        if not serializer() then table.insert(new_list, serializer) end
+      end
+      serializer_coroutines = new_list
+      return #serializer_coroutines == 0
+    end
+    return push_task,check_result,pop_result,empty,do_serialization
   end
   
   which,pid = util.split_process(num_cores + 1)
@@ -120,11 +131,12 @@ do
     child_process(which - 1, pid)
   else
     for i=1,num_cores do pipes[i]:set_as_parent() end
-    local push,check,pop,empty=build_scheduler(pipes, locks)
+    local push,check,pop,empty,do_serialization=build_scheduler(pipes, locks)
     scheduler = { push_task = push,
                   check_result = check,
                   pop_result = pop,
-                  empty = empty }
+                  empty = empty,
+                  do_serialization = do_serialization }
   end
 end
 
@@ -165,15 +177,17 @@ function fork_methods:wait()
 end
 
 function fork_methods:send()
-  
+  repeat until scheduler.do_serialization()
 end
 
 function fork_methods:get_max_tasks() return num_cores end
 
 function check_worker()
+  repeat until scheduler.do_serialization()
   while scheduler.check_result() do
     local r = assert( scheduler.pop_result() )
     pending_futures[r.id]._result_ = r.result
+    if r.err then fprintf(io.stderr, r.err) end
   end
 end
 

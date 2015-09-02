@@ -21,6 +21,7 @@ local engine
 local exports = "/tmp/exports"
 local min_task_len = 32
 local tmp = "/tmp"
+local wait_step = 1.0
 
 -- interface table to retrieve and update config variables
 local api
@@ -30,10 +31,12 @@ api = {
   exports = function() assert(os.execute("mkdir -p "..exports)) return exports end,
   min_task_len = function() return min_task_len end,
   tmp = function() return tmp end,
+  wait_step = function() return wait_step end,
   --
   set_engine = function(obj) assert(obj) assert(obj.execute) engine = obj end,
   set_exports = function(str) assert(type(str) == "string") exports = str end,
   set_min_task_len = function(n) assert(type(n) == "number") min_task_len = n end,
   set_tmp = function(str) assert(type(str) == "string") tmp = str end,
+  set_wait_step = function(n) assert(type(n) == "number") wait_step = n end,
 }
 return api

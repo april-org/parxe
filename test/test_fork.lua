@@ -19,16 +19,12 @@ local px     = require "parxe"
 local engine = require "parxe.engines.fork"
 px.config.set_engine(engine)
 
-local f = px.map(iterator.range(4):table(), function(x) return 2*x end)
-local r = f:get()
-pprint(r)
+local m = matrix(8192,20):linspace()
 
-local m = matrix(2^14,20):linspace()
+local f1 = px.map(iterator.range(1024):table(), function(x) return 2*x end)
+local f2 = px.map(m, function(x) return stats.amean(x) end)
+local f3 = px.map.bunch(m, function(x) return stats.amean(x,2) end)
 
-local f = px.map(m, function(x) return 2*x end)
-local r = f:get()
-print(r)
-
-local f = px.map.bunch(m, function(x) return 2*x end)
-local r = f:get()
-print(r)
+print(table.concat(f1:get(), ","))
+print(f2:get())
+print(f3:get())

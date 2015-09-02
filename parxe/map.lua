@@ -31,13 +31,23 @@ local px_slice_map_table = function(slice_object, map_func, ...)
   return result
 end
 
+local type = type
 local px_slice_map_matrix = function(slice_object, map_func, ...)
+  local all_matrix = true
   local result = {}
   for i=1,#slice_object do
     local m = map_func(slice_object[i], ...)
-    result[i] = m:rewrap(1, table_unpack(m:dim()))
+    local tt = type(m)
+    if tt:find("^matrix") then
+      m = m:rewrap(1, table_unpack(m:dim()))
+    elseif tt == "number" then
+      result[i] = matrix(1,1,{m})
+    else
+      result[i] = m
+      all_matrix = false
+    end
   end
-  return px_matrix_join(1, result)
+  return all_matrix and px_matrix_join(1, result) or result
 end
 
 local px_slice_map_bunch = function(slice_object, map_func, ...)
@@ -69,7 +79,7 @@ local private_map = function(object, bunch, map_func, ...)
                                   map_func,
                                   ...)
     end
-    engine:send()
+    -- engine:send()
     return future.all(futures)
   end
 end
