@@ -35,6 +35,31 @@ local singleton
 local check_worker
 local in_dict = {}
 local pending_futures = {}
+local allowed_resources = { mem=true, q=true, name=true, omp=true }
+local resources = {}
+local shell_sources = {}
+
+---------------------------------------------------------------------------
+
+local function execute_qsub(id, tmp, tmpname)
+  local qsub = io.popen("qsub -N %s"%{resources.name or tmpname}, "w")
+  qsub:write("#PBS -l nice=19\n")
+  qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
+  if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
+  qsub:write("#PBS -m a\n")
+  qsub:write("#PBS -d %s\n"%{tmp})
+  qsub:write("#PBS -o %s.OU\n"%{tmpname})
+  qsub:write("#PBS -o %s.ER\n"%{tmpname})
+  qsub:write("echo %s\n"%{tmpname})
+  qsub:write("echo %d\n"%{id})
+  for _,v in pairs(shell_sources) do qsub:write(". %s\n"%{v}) end
+  qsub:write("cd $PBS_O_WORKDIR\n")
+  qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
+  qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
+  qsub:write("export PARXE_TASKID=%d\n"%{id})
+  qsub:write("april-ann -l parxe.engines.templates.worker_script")
+  qsub:close()
+end
 
 ---------------------------------------------------------------------------
 
@@ -47,10 +72,14 @@ end
 function pbs_methods:execute(func, ...)
   local args = table.pack(...)
   local task_id = common.next_task_id()
+  local tmp = config.tmp()
+  local tmpname = "%s/PARXE_TASK_%d_%s"%{tmp,os.date("%Y%m%d%H%M%S")}
   local f = future(check_worker)
   f.task_id = task_id
+  f.tmpname = tmpname
   pending_futures[task_id] = f
   in_dict[task_id] = { id=task_id, func=func, args=args }
+  execute_qsub(task_id, tmp, tmpname)
   return f
 end
 
@@ -64,6 +93,15 @@ function pbs_methods:wait()
 end
 
 function pbs_methods:get_max_tasks() return math.huge end
+
+function pbs_methods:set_resource(key, value)
+  april_assert(allowed_resources[key], "Not allowed resources name %s", key)
+  resources[key] = value
+end
+
+function pbs_methods:set_shell_source(value)
+  table.insert(shell_sources, value)
+end
 
 local running_clients = {}
 function check_worker()
