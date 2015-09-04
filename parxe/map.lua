@@ -62,7 +62,6 @@ local private_map = function(object, bunch, map_func, ...)
                                   map_func,
                                   ...)
     end
-    -- engine:send()
     return future.all(futures)
   end
 end

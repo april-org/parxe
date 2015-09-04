@@ -23,6 +23,8 @@ local pipe   = require "parxe.pipe"
 
 ---------------------------------------------------------------------------
 
+local fork,fork_methods = class("parxe.engine.fork")
+local singleton
 local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
 local scheduler
 local pipes = {}
@@ -42,7 +44,10 @@ do
       -- FIXME: MEMORY LEAK POSSIBLE WHEN ERROR IS PRODUCED
       local ok,result = xpcall(func,debug.traceback,table.unpack(args))
       local err = nil
-      if not ok then err,result=result,{} end
+      if not ok then
+        err,result = result,{}
+        -- FIXME: Is it necessary? singleton = fork()
+      end
       lock:make() -- mark as job done
       local serializer = make_serializer({ result=result, id=id, err=err }, stream)
       repeat until serializer()
@@ -147,8 +152,6 @@ local pending_futures = {}
 
 ---------------------------------------------------------------------------
 
-local fork,fork_methods = class("parxe.engine.fork")
-
 function fork:constructor()
 end
 
@@ -176,10 +179,6 @@ function fork_methods:wait()
   until not next(pending_futures)
 end
 
-function fork_methods:send()
-  repeat until scheduler.do_serialization()
-end
-
 function fork_methods:get_max_tasks() return num_cores end
 
 function check_worker()
@@ -193,6 +192,6 @@ end
 
 ----------------------------------------------------------------------------
 
-local singleton = fork()
+singleton = fork() -- local variable taken from the header of this file
 class.extend_metamethod(fork, "__call", function() return singleton end)
 return singleton
