@@ -20,9 +20,20 @@ local config = require "parxe.config"
 -----------------------------------------------------------------------------
 
 local range_object,range_object_methods = class("parxe.range_object")
-function range_object:constructor(a,b) self.a = a self.b = b end
+function range_object:constructor(a,b) self.a = a self.b = b self.n = b-a+1 end
 function range_object_methods:ctor_name() return 'class.find("parxe.range_object")' end
 function range_object_methods:ctor_params() return self.a,self.b end
+class.extend_metamethod(range_object, "__len", function(self) return self.n end)
+class.declare_functional_index(range_object,
+                               function(self,key)
+                                 if type(key) == "number" then return self.a + key - 1 end
+end)
+local function ipairs_range_object(self, i)
+  i = i + 1
+  if i <= #self then return i,self[i] end
+end
+class.extend_metamethod(range_object, "__ipairs",
+                        function(self) return ipairs_range_object,self,0 end)
 
 -----------------------------------------------------------------------------
 
@@ -81,16 +92,10 @@ local function take_slice(obj, a, b)
   return object_slice
 end
 
-local function matrix_join(n, tbl)
-  if #tbl == 1 then return tbl[1] end
-  return matrix.join(n, tbl)
-end
-
 return {
   deserialize = deserialize,
   gettime = gettime,
   make_serializer = make_serializer,
-  matrix_join = matrix_join,
   next_task_id = next_task_id,
   range_object = range_object,
   take_slice = take_slice,

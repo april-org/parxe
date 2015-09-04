@@ -26,9 +26,9 @@ pprint(r)
 local m = matrix(1024,20):linspace()
 
 local f = px.map(m, function(x) return 2*x end)
-local r = f:get()
+local r = matrix.join(0,f:get())
 print(r)
 
 local f = px.map.bunch(m, function(x) return 2*x end)
-local r = f:get()
+local r = matrix.join(1,f:get())
 print(r)

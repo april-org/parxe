@@ -22,46 +22,24 @@ local common = require "parxe.common"
 local table_unpack   = table.unpack
 local print          = print
 
-local px_matrix_join = common.matrix_join
 local range_object   = common.range_object
 local take_slice     = common.take_slice
 
-local px_slice_map_table = function(slice_object, map_func, ...)
+local px_slice_map = function(slice_object, map_func, ...)
   local result = {}
   for i=1,#slice_object do result[i] = map_func(slice_object[i], ...) end
+  april_assert(#result == 0 or #result == #slice_object,
+               "Incorrect number of returned values, expected %d, found %d",
+               #slice_object, #result)
   return result
 end
 
-local type = type
-local px_slice_map_matrix = function(slice_object, map_func, ...)
-  local all_matrix = true
-  local function process(obj, ...)
-    local m = map_func(obj, ...)
-    local tt = type(m)
-    if tt:find("^matrix") then
-      m = m:rewrap(1, table_unpack(m:dim()))
-    elseif tt == "number" then
-      m = matrix(1,1,{m})
-    else
-      all_matrix = false
-    end
-    return m
-  end
-  local result = {}
-  if class.is_a(slice_object, range_object) then
-    for i=slice_object.a,slice_object.b do result[i] = process(i, ...) end
-  else
-    for i=1,#slice_object do result[i] = process(slice_object[i], ...) end
-  end
-  return all_matrix and px_matrix_join(1, result) or result
-end
-
-local px_slice_map_bunch = function(slice_object, map_func, ...)
-  if class.is_a(slice_object, range_object) then
-    return map_func(slice_object.a, slice_object.b, ...)
-  else
-    return map_func(slice_object, ...)
-  end
+local px_map_bunch = function(slice_object, map_func, ...)
+  local result = map_func(slice_object, ...)
+  april_assert(not result or #result == #slice_object,
+               "Incorrect number of returned values, expected %d, found %d",
+               #slice_object, #result)
+  return result
 end
 
 -- object needs should be a number or an iterable using # and [] operators
@@ -75,12 +53,7 @@ local private_map = function(object, bunch, map_func, ...)
     local N = (type(object)=="number" and object) or #object
     local M = engine:get_max_tasks() or N
     local K = math.max(math.ceil(N/M), min_task_len)
-    local slice_map
-    if bunch then
-      slice_map = px_slice_map_bunch
-    else
-      slice_map = type(object):find("^matrix") and px_slice_map_matrix or px_slice_map_table
-    end
+    local slice_map = bunch and px_map_bunch or px_slice_map
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end

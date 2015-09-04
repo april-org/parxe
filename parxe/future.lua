@@ -20,7 +20,6 @@ local config = require "parxe.config"
 local future,future_methods = class("parxe.future")
 
 local gettime = common.gettime
-local px_matrix_join = common.matrix_join
 
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 
@@ -71,20 +70,17 @@ local all_do_work = function(self)
   end
   if not all_ready then return false end
   -- the code below is executed once all futures are ready
-  local all_matrix = true
   local result = {}
   for i,f in ipairs(self.data) do
     local values = f:get()
     if type(values):find("^matrix") then
       result[i] = values
     else
-      all_matrix = false
       for _,v in ipairs(values) do
         table.insert(result, v)
       end
     end
   end
-  if all_matrix then result = px_matrix_join(1, result) end
   self._result_ = result
 end
 

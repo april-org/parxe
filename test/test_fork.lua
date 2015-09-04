@@ -18,18 +18,25 @@
 local px     = require "parxe"
 local engine = require "parxe.engines.fork"
 px.config.set_engine(engine)
-
+-- mapping a table of data
 local f1 = px.map(iterator.range(1024):table(), function(x) return 2*x end)
-local f2 = px.map(matrix(1024,20):linspace(), function(x) return stats.amean(x) end)
-local f3 = px.map.bunch(1024,
-                        function(a,b)
-                          local m = matrix(b-a+1,20):linspace((a-1)*20+1,b*20)
+-- mapping a matrix
+local f2 = px.map(matrix(1024,20):linspace(), function(x) return stats.amean(x,1) end)
+-- mapping a range of 1024 numbers
+local f3 = px.map(1024, function(x) return 2*x end)
+-- mapping a range of 1024 in bunches
+local f4 = px.map.bunch(1024,
+                        function(obj)
+                          local n,a,b = #obj,obj[1],obj[#obj]
+                          local m = matrix(#obj,20):linspace((a-1)*20+1,b*20)
                           return stats.amean(m,2)
 end)
-local f4 = px.map.bunch(matrix(1024,20):linspace(),
+-- mapping a matrix in bunches
+local f5 = px.map.bunch(matrix(1024,20):linspace(),
                         function(x) return stats.amean(x,2) end)
-
+--
 print(table.concat(f1:get(), ","))
-print(f2:get())
-print(f3:get())
-print(f4:get())
+print(matrix.join(0,f2:get()))
+print(table.concat(f3:get(), ","))
+print(matrix.join(1,f4:get()))
+print(matrix.join(1,f5:get()))
