@@ -54,10 +54,10 @@ function pbs_methods:execute(func, ...)
   return f
 end
 
-function pbs_methods:wait(timeout)
+function pbs_methods:wait()
   repeat
     for task_id,f in pairs(pending_futures) do
-      f:wait(timeout)
+      f:wait()
       pending_futures[task_id] = nil
     end
   until not next(pending_futures)
@@ -82,7 +82,7 @@ function check_worker()
       pending_futures[r.id]._result_ = r.result or true
       if r.err then fprintf(io.stderr, r.err) end
     end
-  until not mpi_utils.check_clients(cnn, running_clients)
+  until not next(running_clients)
 end
 
 ----------------------------------------------------------------------------

@@ -40,9 +40,6 @@ end
 local function check_any_result(cnn, running_clients)
 end
 
-local function check_clients(cnn, running_clients)
-end
-
 local function run_server(server_name)
 end
 
@@ -52,7 +49,6 @@ end
 return {
   accept_connection = accept_connection,
   check_any_result = check_any_result,
-  check_clients = check_clients,
   run_server = run_server,
   send_task = send_task,
 }
