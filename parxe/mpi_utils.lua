@@ -124,7 +124,7 @@ end
 
 local function task_done(cnn, result)
   send(cnn, util.serialize(result), 0)
-  MPI.Comm_disconnect(client)
+  MPI.Comm_disconnect(cnn)
   MPI.Finalize()
 end
 
