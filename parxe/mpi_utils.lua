@@ -43,9 +43,9 @@ local function recv_with_client(cli)
   return recv_with_status(status, cli)
 end
 
-local function send(cli, str)
+local function send(cli, str, rank)
   local message = buffer.new_buffer(str)
-  MPI.Send(message, #message, MPI.BYTE, 1, 0, cli)
+  MPI.Send(message, #message, MPI.BYTE, rank, 0, cli)
 end
 
 -------------------------------------------------------------------------------
@@ -84,7 +84,7 @@ local function child_connect(server_name, port_name, id)
   print("Port:", pub_name, port_name)
   MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
   print("Connected")
-  send(client, tostring(id))
+  send(client, tostring(id), 0)
   return client
 end
 
@@ -110,7 +110,7 @@ local function run_server(server_name)
 end
 
 local function send_task(cli, task)
-  send(cli, util.serialize(task))
+  send(cli, util.serialize(task), 1)
 end
 
 local function stop_server(cnn)
@@ -120,7 +120,7 @@ local function stop_server(cnn)
 end
 
 local function task_done(cnn, result)
-  send(cnn, util.serialize(result))
+  send(cnn, util.serialize(result), 0)
   MPI.Comm_disconnect(client)
   MPI.Finalize()
 end
