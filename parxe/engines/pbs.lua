@@ -62,8 +62,8 @@ local function execute_qsub(id, tmp, tmpname)
   qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
   qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
   qsub:write("export PARXE_TASKID=%d\n"%{id})
-  qsub:write("%s %s -l parxe.engines.templates.worker_script"%{resources.mpirun,
-                                                               resources.appname})
+  qsub:write("%s %s -l parxe.engines.templates.pbs_worker_script"%{resources.mpirun,
+                                                                   resources.appname})
   qsub:close()
 end
 
@@ -111,7 +111,6 @@ function pbs_methods:append_shell_line(value)
   table.insert(shell_lines, value)
 end
 
-local running_clients = {}
 function check_worker()
   repeat
     local cli = mpi_utils.accept_connection(cnn)
@@ -119,12 +118,11 @@ function check_worker()
       local task_id = mpi_utils.receive_task_id(cnn, cli)
       local task = in_dict[task_id]
       in_dict[task_id] = nil
-      mpi_utils.send_task(cnn, cli, task)
+      mpi_utils.send_task(cli, task)
       running_clients[task_id] = cli
     end
-    local r = mpi_utils.check_any_result(cnn, running_clients)
+    local r = mpi_utils.check_any_result(running_clients)
     if r then
-      running_clients[r.id] = nil
       pending_futures[r.id]._result_ = r.result or true
       if r.err then fprintf(io.stderr, r.err) end
     end

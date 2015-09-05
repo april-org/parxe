@@ -26,5 +26,4 @@ local func, args, id = task.func, task.args, task.id assert(TASK_ID == id)
 local ok,result = xpcall(func,debug.traceback,table.unpack(args))
 local err = nil
 if not ok then err,result=result,{} end
-mpi_utils.task_done(cnn, id)
-mpi_utils.disconnect(cnn)
+mpi_utils.task_done(cnn, {id=id, result=result, err=err})

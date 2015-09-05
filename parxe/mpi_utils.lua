@@ -18,12 +18,37 @@
 local MPI    = require "MPI"
 local buffer = require "buffer"
 
-local INFO_NULL  = MPI.INFO_NULL
+local ANY_SOURCE = MPI.ANY_SOURCE
 local COMM_WORLD = MPI.COMM_WORLD
+local INFO_NULL  = MPI.INFO_NULL
 local MAX_PORT_NAME = MPI.MAX_PORT_NAME
 
 signal.register(signal.SIGALRM, function() end)
 signal.register(signal.SIGINT, function() error("Received SIGINT") end)
+
+-- private functions
+
+local function recv_with_status(status, cli)
+  local num_recvb = buffer.new_buffer(buffer.sizeof(buffer.int))
+  MPI.Get_count(status, MPI.BYTE, num_recvb)
+  local num_recv = buffer.get_typed(num_recvb, buffer.int, 0)
+  local message = buffer.new_buffer(num_recv)
+  MPI.Recv(message, #message, MPI.BYTE, ANY_SOURCE, 0, cli or COMM_WORLD, status)
+  return message,status
+end
+
+local function recv_with_client(cli)
+  local status = MPI.Status()
+  MPI.Probe(ANY_SOURCE, 0, cli, status)
+  return recv_with_status(status, cli)
+end
+
+local function send(cli, str)
+  local message = buffer.new_buffer(str)
+  MPI.Send(message, #message, MPI.BYTE, 1, 0, cli)
+end
+
+-------------------------------------------------------------------------------
 
 local function accept_connection(cnn)
   local client = MPI.Comm()
@@ -36,14 +61,30 @@ local function accept_connection(cnn)
   end
 end
 
-local function check_any_result(cnn, running_clients)
-  MPI.Comm_free(cnn.client)
+local function check_any_result(running_clients, pending_futures)
+  local flagb = buffer.new_buffer(buffer.sizeof(buffer.int))
+  local status = MPI.Status()
+  MPI.Iprobe(ANY_SOURCE, 0, COMM_WORLD, 0, flagb, status)
+  local flag = buffer.get_typed(flagb, buffer.int, 0)
+  if flag == 1 then
+    local b = recv_with_status(status)
+    local result = util.deserialize(tostring(b))
+    MPI.Comm_free(running_clients[result.id])
+    running_clients[r.id] = nil
+    return result
+  end
 end
 
 local function child_connect(server_name, id)
-end
-
-local function disconnect(cnn)
+  local pub_name  = buffer.new_buffer(server_name)
+  local port_name = buffer.new_buffer(MPI.MAX_PORT_NAME+1)
+  local client    = MPI.Comm()
+  MPI.Lookup_name(pub_name, INFO_NULL, port_name)
+  print("Port:", pub_name, port_name)
+  MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+  print("Connected")
+  send(client, tostring(id))
+  return client
 end
 
 local function run_server(server_name)
@@ -62,7 +103,13 @@ local function run_server(server_name)
   return { port_name=port_name, pub_name=pub_name }
 end
 
-local function send_task(cnn, cli, task)
+local function receive_task_id(server, worker)
+  local task_id = tonumber(tostring(recv_with_client(worker)))
+  return task_id
+end
+
+local function send_task(cli, task)
+  send(cli, util.serialize(task))
 end
 
 local function stop_server(cnn)
@@ -71,7 +118,10 @@ local function stop_server(cnn)
   MPI.Finalize()
 end
 
-local function task_done(cnn, id)
+local function task_done(cnn, result)
+  send(cnn, util.serialize(result))
+  MPI.Comm_disconnect(client)
+  MPI.Finalize()
 end
 
 return {
