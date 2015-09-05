@@ -65,7 +65,7 @@ end
 local function check_any_result(running_clients, pending_futures)
   local flagb = buffer.new_buffer(buffer.sizeof(buffer.int))
   local status = MPI.Status()
-  MPI.Iprobe(ANY_SOURCE, 0, COMM_WORLD, 0, flagb, status)
+  MPI.Iprobe(ANY_SOURCE, 0, COMM_WORLD, flagb, status)
   local flag = buffer.get_typed(flagb, buffer.int, 0)
   if flag == 1 then
     local b = recv_with_status(status)
