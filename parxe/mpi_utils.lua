@@ -44,6 +44,7 @@ local function recv_with_client(cli)
 end
 
 local function send(cli, str, rank)
+  print("SEND", str, rank)
   local message = buffer.new_buffer(str)
   MPI.Send(message, #message, MPI.BYTE, rank, 0, cli)
 end
@@ -55,6 +56,7 @@ local function accept_connection(cnn)
   util.alarm(0.01)
   local r = MPI.Comm_accept(cnn.port_name, INFO_NULL, 0, COMM_WORLD, client)
   if r == MPI.SUCCESS then
+    print(client)
     return client
   else
     MPI.Comm_free(client)
@@ -90,6 +92,7 @@ end
 
 local function receive_task_id(server, worker)
   local task_id = tonumber(tostring(recv_with_client(worker)))
+  print(task_id)
   return task_id
 end
 
