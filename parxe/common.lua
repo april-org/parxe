@@ -15,8 +15,6 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local config = require "parxe.config"
-
 -----------------------------------------------------------------------------
 
 local range_object,range_object_methods = class("parxe.range_object")
@@ -38,6 +36,7 @@ class.extend_metamethod(range_object, "__ipairs",
 -----------------------------------------------------------------------------
 
 local function deserialize(f)
+  local config = require "parxe.config"
   local line = f:read("*l") if not line then return end
   local n = tonumber(line)
   return util.deserialize{
@@ -65,6 +64,7 @@ end
 local function make_serializer(obj, f)
   return coroutine.wrap(
     function()
+      local config = require "parxe.config"
       local str = util.serialize(obj)
       local n   = #str
       assert( f:write(n) )
@@ -92,6 +92,14 @@ local function take_slice(obj, a, b)
   return object_slice
 end
 
+local function user_conf(filename, ...)
+  local HOME = os.getenv("HOME")
+  if HOME then
+    local CONF = HOME.."/.parxe/default/" .. filename
+    local f = io.open(CONF) if f then f:close() loadfile(CONF)(...) end
+  end
+end
+
 return {
   deserialize = deserialize,
   gettime = gettime,
@@ -99,4 +107,5 @@ return {
   next_task_id = next_task_id,
   range_object = range_object,
   take_slice = take_slice,
+  user_conf = user_conf,
 }

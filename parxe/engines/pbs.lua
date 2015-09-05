@@ -22,8 +22,11 @@ local mpi_utils = require "parxe.mpi_utils"
 
 ---------------------------------------------------------------------------
 
-local SERVER = os.tmpname()
-local cnn    = mpi_utils.run_server(SERVER)
+local f = io.popen("hostname")
+local HOSTNAME = f:read("*l") f:close()
+local TMPNAME  = os.tmpname()
+local SERVER   = TMPNAME:basename()
+local cnn      = mpi_utils.run_server(SERVER)
 
 ---------------------------------------------------------------------------
 
@@ -35,29 +38,32 @@ local singleton
 local check_worker
 local in_dict = {}
 local pending_futures = {}
-local allowed_resources = { mem=true, q=true, name=true, omp=true }
-local resources = {}
-local shell_sources = {}
+local allowed_resources = { mem=true, q=true, name=true, omp=true, mpirun=true,
+                            appname=true }
+local resources = { mpirun="mpirun -nameserver %s"%{HOSTNAME},
+                    appname="april-ann" }
+local shell_lines = {}
 
 ---------------------------------------------------------------------------
 
 local function execute_qsub(id, tmp, tmpname)
-  local qsub = io.popen("qsub -N %s"%{resources.name or tmpname}, "w")
+  local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
   qsub:write("#PBS -l nice=19\n")
   qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
   if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
   qsub:write("#PBS -m a\n")
   qsub:write("#PBS -d %s\n"%{tmp})
   qsub:write("#PBS -o %s.OU\n"%{tmpname})
-  qsub:write("#PBS -o %s.ER\n"%{tmpname})
+  qsub:write("#PBS -e %s.ER\n"%{tmpname})
   qsub:write("echo %s\n"%{tmpname})
   qsub:write("echo %d\n"%{id})
-  for _,v in pairs(shell_sources) do qsub:write(". %s\n"%{v}) end
+  for _,v in pairs(shell_lines) do qsub:write("%s\n"%{v}) end
   qsub:write("cd $PBS_O_WORKDIR\n")
   qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
   qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
   qsub:write("export PARXE_TASKID=%d\n"%{id})
-  qsub:write("april-ann -l parxe.engines.templates.worker_script")
+  qsub:write("%s %s -l parxe.engines.templates.worker_script"%{resources.mpirun,
+                                                               resources.appname})
   qsub:close()
 end
 
@@ -67,13 +73,15 @@ function pbs:constructor()
 end
 
 function pbs:destructor()
+  mpi_utils.stop_server(cnn)
+  os.remove(TMPNAME)
 end
 
 function pbs_methods:execute(func, ...)
-  local args = table.pack(...)
+  local args    = table.pack(...)
   local task_id = common.next_task_id()
   local tmp = config.tmp()
-  local tmpname = "%s/PARXE_TASK_%d_%s"%{tmp,os.date("%Y%m%d%H%M%S")}
+  local tmpname = "%s/PARXE_TASK_%d_%s"%{tmp,task_id,os.date("%Y%m%d%H%M%S")}
   local f = future(check_worker)
   f.task_id = task_id
   f.tmpname = tmpname
@@ -92,15 +100,15 @@ function pbs_methods:wait()
   until not next(pending_futures)
 end
 
-function pbs_methods:get_max_tasks() return math.huge end
+function pbs_methods:get_max_tasks() return 2 end
 
 function pbs_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
   resources[key] = value
 end
 
-function pbs_methods:set_shell_source(value)
-  table.insert(shell_sources, value)
+function pbs_methods:append_shell_line(value)
+  table.insert(shell_lines, value)
 end
 
 local running_clients = {}
@@ -127,4 +135,5 @@ end
 
 singleton = pbs()
 class.extend_metamethod(pbs, "__call", function() return singleton end)
+common.user_conf("pbs.lua", singleton)
 return singleton

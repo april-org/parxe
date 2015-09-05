@@ -16,6 +16,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 
+local common = require "parxe.common"
+
 -- config variables, they are private
 local block_size = 2^20
 local engine
@@ -42,4 +44,5 @@ api = {
   set_tmp = function(str) assert(type(str) == "string") tmp = str end,
   set_wait_step = function(n) assert(type(n) == "number") wait_step = n end,
 }
+common.user_conf("config.lua", api)
 return api

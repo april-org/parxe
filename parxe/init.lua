@@ -26,4 +26,5 @@ local parxe = {
   map       = require "parxe.map",
   reduce    = require "parxe.reduce",
 }
+
 return parxe
