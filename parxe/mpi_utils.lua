@@ -100,6 +100,7 @@ local function run_server(server_name)
   local port_name = buffer.new_buffer(MAX_PORT_NAME+1)
   MPI.Open_port(INFO_NULL, port_name)
   MPI.Publish_name(pub_name, INFO_NULL, port_name)
+  print(port_name)
   return { port_name=port_name, pub_name=pub_name }
 end
 
