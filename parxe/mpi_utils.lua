@@ -32,8 +32,10 @@ local function recv_with_status(status, cli)
   local num_recvb = buffer.new_buffer(buffer.sizeof(buffer.int))
   MPI.Get_count(status, MPI.BYTE, num_recvb)
   local num_recv = buffer.get_typed(num_recvb, buffer.int, 0)
+  print("receiving", num_recv)
   local message = buffer.new_buffer(num_recv)
   MPI.Recv(message, #message, MPI.BYTE, ANY_SOURCE, 0, cli or COMM_WORLD, status)
+  print("RECEIVED", #message)
   return message,status
 end
 
@@ -45,7 +47,9 @@ end
 
 local function send(cli, str, rank)
   local message = buffer.new_buffer(str)
+  print("sending", #str)
   MPI.Send(message, #message, MPI.BYTE, rank, 0, cli)
+  print("SENDED")
 end
 
 -------------------------------------------------------------------------------
@@ -55,6 +59,7 @@ local function accept_connection(cnn)
   util.alarm(0.01)
   local r = MPI.Comm_accept(cnn.port_name, INFO_NULL, 0, COMM_WORLD, client)
   if r == MPI.SUCCESS then
+    print("CONNECTION", client)
     return client
   else
     MPI.Comm_free(client)
@@ -68,6 +73,7 @@ local function check_any_result(running_clients, pending_futures)
   local flag = buffer.get_typed(flagb, buffer.int, 0)
   if flag == 1 then
     local b = recv_with_status(status)
+    print("RECEIVED RESULT", #b)
     local result = util.deserialize(tostring(b))
     MPI.Comm_free(running_clients[result.id])
     running_clients[r.id] = nil
@@ -77,11 +83,15 @@ end
 
 local function child_connect(port_name, id)
   MPI.Init()
+  print("CONNECTION", port_name, id)
   local port_name = buffer.new_buffer(port_name)
   local client    = MPI.Comm()
   MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+  print("CONNECTED")
   send(client, tostring(id), 0)
+  print("ID SENDED")
   local str = tostring(recv_with_client(client))
+  print("TASK RECEIVED")
   local task = util.deserialize(str)
   return client,task
 end
