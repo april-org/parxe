@@ -27,6 +27,7 @@ local HOSTNAME = f:read("*l") f:close()
 local TMPNAME  = os.tmpname()
 local SERVER   = TMPNAME:basename()
 local cnn      = mpi_utils.run_server(SERVER)
+local PORT     = tostring(cnn.port_name)
 
 ---------------------------------------------------------------------------
 
@@ -38,9 +39,9 @@ local singleton
 local check_worker
 local in_dict = {}
 local pending_futures = {}
-local allowed_resources = { mem=true, q=true, name=true, omp=true, mpirun=true,
+local allowed_resources = { mem=true, q=true, name=true, omp=true, mpiexec=true,
                             appname=true }
-local resources = { mpirun="mpirun -nameserver %s"%{HOSTNAME},
+local resources = { mpiexec="mpiexec -nameserver %s"%{HOSTNAME},
                     appname="april-ann" }
 local shell_lines = {}
 
@@ -56,18 +57,20 @@ local function execute_qsub(id, tmp, tmpname)
   qsub:write("#PBS -o %s.OU\n"%{tmpname})
   qsub:write("#PBS -e %s.ER\n"%{tmpname})
   for _,v in pairs(shell_lines) do qsub:write("%s\n"%{v}) end
+  qsub:write("cd $PBS_O_WORKDIR\n")
+  qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
+  qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
+  qsub:write("export PARXE_TASKID=%d\n"%{id})
+  qsub:write("export PARXE_PORT=%s\n"%{PORT})
   qsub:write("echo \"# DATE:     $(date)\"\n")
   qsub:write("echo \"# HOSTNAME: $(hostname)\"\n")
   qsub:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
   qsub:write("echo \"# TASK_ID:  %d\"\n"%{id})
   qsub:write("echo \"# SERVER:   %s\"\n"%{SERVER})
-  qsub:write("echo \"# MPIRUN:   %s\"\n"%{resources.mpirun})
+  qsub:write("echo \"# PORT:     %s\"\n"%{PORT})
+  qsub:write("echo \"# MPIEXEC:  %s\"\n"%{resources.mpiexec})
   qsub:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
-  qsub:write("cd $PBS_O_WORKDIR\n")
-  qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
-  qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
-  qsub:write("export PARXE_TASKID=%d\n"%{id})
-  qsub:write("%s %s -l parxe.engines.templates.pbs_worker_script"%{resources.mpirun,
+  qsub:write("%s %s -l parxe.engines.templates.pbs_worker_script"%{resources.mpiexec,
                                                                    resources.appname})
   qsub:close()
 end

@@ -76,6 +76,7 @@ local function check_any_result(running_clients, pending_futures)
 end
 
 local function child_connect(server_name, id)
+  MPI.Init()
   local pub_name  = buffer.new_buffer(server_name)
   local port_name = buffer.new_buffer(MPI.MAX_PORT_NAME+1)
   local client    = MPI.Comm()
@@ -99,7 +100,6 @@ local function run_server(server_name)
   local port_name = buffer.new_buffer(MAX_PORT_NAME+1)
   MPI.Open_port(INFO_NULL, port_name)
   MPI.Publish_name(pub_name, INFO_NULL, port_name)
-  print("Port:", pub_name, port_name)
   return { port_name=port_name, pub_name=pub_name }
 end
 
