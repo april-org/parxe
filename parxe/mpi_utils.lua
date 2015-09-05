@@ -44,7 +44,6 @@ local function recv_with_client(cli)
 end
 
 local function send(cli, str, rank)
-  print("SEND", str, rank)
   local message = buffer.new_buffer(str)
   MPI.Send(message, #message, MPI.BYTE, rank, 0, cli)
 end
@@ -92,7 +91,7 @@ end
 
 local function receive_task_id(server, worker)
   local task_id = tonumber(tostring(recv_with_client(worker)))
-  print(task_id)
+  print("RECEIVED CHILD", task_id)
   return task_id
 end
 
@@ -113,7 +112,7 @@ local function run_server(server_name)
 end
 
 local function send_task(cli, task)
-  send(cli, util.serialize(task), 1)
+  send(cli, util.serialize(task), 0)
 end
 
 local function stop_server(cnn)
