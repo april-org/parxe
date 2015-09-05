@@ -66,7 +66,8 @@ local function accept_connection(cnn)
   end
 end
 
-local function check_any_result(running_clients, pending_futures)
+local function check_any_result(running_clients)
+  print("CHECKING")
   local flagb = buffer.new_buffer(buffer.sizeof(buffer.int))
   local status = MPI.Status()
   MPI.Iprobe(ANY_SOURCE, 0, COMM_WORLD, flagb, status)
