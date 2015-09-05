@@ -75,8 +75,10 @@ local function check_any_result(running_clients, pending_futures)
     local b = recv_with_status(status)
     print("RECEIVED RESULT", #b)
     local result = util.deserialize(tostring(b))
-    MPI.Comm_free(running_clients[result.id])
-    running_clients[r.id] = nil
+    local client = running_clients[result.id]
+    running_clients[result.id] = nil
+    MPI.Comm_disconnect(client)
+    MPI.Comm_free(client)
     return result
   end
 end
