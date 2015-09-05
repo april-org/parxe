@@ -28,6 +28,9 @@ local TMPNAME  = os.tmpname()
 local SERVER   = TMPNAME:basename()
 local cnn      = mpi_utils.run_server(SERVER)
 local PORT     = tostring(cnn.port_name)
+for i=1,#PORT do
+  if PORT:sub(i,i):byte() == 0 then PORT = PORT:sub(1,i-1) break end
+end
 
 ---------------------------------------------------------------------------
 
@@ -68,7 +71,7 @@ local function execute_qsub(id, tmp, tmpname)
   qsub:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
   qsub:write("echo \"# TASK_ID:  %d\"\n"%{id})
   qsub:write("echo \"# SERVER:   %s\"\n"%{SERVER})
-  qsub:write("echo \"# PORT:     \\'%s\\'\"\n"%{PORT})
+  qsub:write("echo \"# PORT:     '%s'\"\n"%{PORT})
   qsub:write("echo \"# MPIEXEC:  %s\"\n"%{resources.mpiexec})
   qsub:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
   qsub:write("%s %s -l parxe.engines.templates.pbs_worker_script"%{resources.mpiexec,
