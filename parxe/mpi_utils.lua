@@ -56,7 +56,7 @@ end
 
 local function accept_connection(cnn)
   local client = MPI.Comm()
-  util.alarm(0.01)
+  util.alarm(0.05)
   print("WAITING COMM")
   local r = MPI.Comm_accept(cnn.port_name, INFO_NULL, 0, COMM_WORLD, client)
   print("ALARM")
