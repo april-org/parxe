@@ -48,7 +48,8 @@ local shell_lines = {}
 ---------------------------------------------------------------------------
 
 local function execute_qsub(id, tmp, tmpname)
-  local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
+  -- local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
+  local qsub = io.open("/tmp/qsub.txt", "w")
   qsub:write("#PBS -l nice=19\n")
   qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
   if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
