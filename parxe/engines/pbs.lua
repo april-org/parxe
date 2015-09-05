@@ -123,6 +123,7 @@ function pbs_methods:append_shell_line(value)
   table.insert(shell_lines, value)
 end
 
+local running_clients = {}
 function check_worker()
   repeat
     local cli = mpi_utils.accept_connection(cnn)
