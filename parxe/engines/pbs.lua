@@ -109,7 +109,7 @@ function pbs_methods:wait()
   until not next(pending_futures)
 end
 
-function pbs_methods:get_max_tasks() return 2 end
+function pbs_methods:get_max_tasks() return math.huge end
 
 function pbs_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
