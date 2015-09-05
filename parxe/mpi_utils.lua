@@ -66,6 +66,7 @@ local function accept_connection(cnn)
   else
     MPI.Comm_free(client)
   end
+  util.sleep(0.05)
 end
 
 local function check_any_result(running_clients)
