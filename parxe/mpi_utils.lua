@@ -119,8 +119,11 @@ end
 
 local function task_done(cnn, result)
   send(cnn, util.serialize(result), 0)
+  print("DISCONNECTING")
   MPI.Comm_disconnect(cnn)
+  print("FINALIZING")
   MPI.Finalize()
+  print("GOOD BYE!")
 end
 
 return {
