@@ -20,8 +20,6 @@ local SERVER    = os.getenv("PARXE_SERVER")
 local PORT      = os.getenv("PARXE_PORT")
 local TASK_ID   = tonumber(os.getenv("PARXE_TASKID"))
 --
-io = nil
-os = nil
 local cnn,task = mpi_utils.child_connect(SERVER, PORT, TASK_ID)
 local func, args, id = task.func, task.args, task.id
 assert(TASK_ID == id)
