@@ -88,6 +88,11 @@ local function child_connect(server_name, port_name, id)
   return client
 end
 
+local function receive_task_id(server, worker)
+  local task_id = tonumber(tostring(recv_with_client(worker)))
+  return task_id
+end
+
 local function run_server(server_name)
   -- local sizeb = buffer.new_buffer(buffer.sizeof(buffer.int))
   -- local rankb = buffer.new_buffer(buffer.sizeof(buffer.int))
@@ -102,11 +107,6 @@ local function run_server(server_name)
   MPI.Publish_name(pub_name, INFO_NULL, port_name)
   print(port_name)
   return { port_name=port_name, pub_name=pub_name }
-end
-
-local function receive_task_id(server, worker)
-  local task_id = tonumber(tostring(recv_with_client(worker)))
-  return task_id
 end
 
 local function send_task(cli, task)
@@ -130,6 +130,7 @@ return {
   check_any_result = check_any_result,
   child_connect = child_connect,
   disconnect = disconnect,
+  receive_task_id = receive_task_id,
   run_server = run_server,
   send_task = send_task,
   task_done = task_done,
