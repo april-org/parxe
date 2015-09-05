@@ -55,7 +55,6 @@ local function accept_connection(cnn)
   util.alarm(0.01)
   local r = MPI.Comm_accept(cnn.port_name, INFO_NULL, 0, COMM_WORLD, client)
   if r == MPI.SUCCESS then
-    print(client)
     return client
   else
     MPI.Comm_free(client)
@@ -76,42 +75,27 @@ local function check_any_result(running_clients, pending_futures)
   end
 end
 
-local function child_connect(server_name, port_name, id)
+local function child_connect(port_name, id)
   MPI.Init()
-  local pub_name  = buffer.new_buffer(server_name)
   local port_name = buffer.new_buffer(port_name)
   local client    = MPI.Comm()
-  -- MPI.Lookup_name(pub_name, INFO_NULL, port_name)
-  print("Port:", pub_name, port_name)
   MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
-  print("Connected")
   send(client, tostring(id), 0)
   local str = tostring(recv_with_client(client))
-  io.open("/home/experimentos/l.txt", "w"):write(str)
   local task = util.deserialize(str)
   return client,task
 end
 
 local function receive_task_id(server, worker)
   local task_id = tonumber(tostring(recv_with_client(worker)))
-  print("RECEIVED CHILD", task_id)
   return task_id
 end
 
-local function run_server(server_name)
-  -- local sizeb = buffer.new_buffer(buffer.sizeof(buffer.int))
-  -- local rankb = buffer.new_buffer(buffer.sizeof(buffer.int))
+local function run_server()
   MPI.Init()
-  -- MPI.Comm_rank(MPI.COMM_WORLD, rankb)
-  -- MPI.Comm_size(MPI.COMM_WORLD, sizeb)
-  -- local size = buffer.get_typed(sizeb, buffer.int, 0)
-  -- local rank = buffer.get_typed(rankb, buffer.int, 0)
-  local pub_name  = buffer.new_buffer(server_name)
   local port_name = buffer.new_buffer(MAX_PORT_NAME+1)
   MPI.Open_port(INFO_NULL, port_name)
-  MPI.Publish_name(pub_name, INFO_NULL, port_name)
-  print(port_name)
-  return { port_name=port_name, pub_name=pub_name }
+  return { port_name=port_name }
 end
 
 local function send_task(cli, task)
@@ -119,7 +103,6 @@ local function send_task(cli, task)
 end
 
 local function stop_server(cnn)
-  MPI.Unpublish_name(cnn.pub_name, INFO_NULL, cnn.port_name)
   MPI.Close_port(cnn.port_name)
   MPI.Finalize()
 end
