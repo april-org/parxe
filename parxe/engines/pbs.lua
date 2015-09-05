@@ -44,7 +44,7 @@ local in_dict = {}
 local pending_futures = {}
 local allowed_resources = { mem=true, q=true, name=true, omp=true, mpiexec=true,
                             appname=true }
-local resources = { mpiexec="mpiexec -nameserver %s"%{HOSTNAME},
+local resources = { mpiexec="mpiexec",
                     appname="april-ann" }
 local shell_lines = {}
 
@@ -65,8 +65,9 @@ local function execute_qsub(id, tmp, tmpname)
   qsub:write("export PARXE_SERVER=%s\n"%{SERVER})
   qsub:write("export PARXE_TASKID=%d\n"%{id})
   qsub:write("export PARXE_PORT='%s'\n"%{PORT})
+  qsub:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
+  qsub:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
   qsub:write("echo \"# DATE:     $(date)\"\n")
-  qsub:write("echo \"# HOSTNAME: $(hostname)\"\n")
   qsub:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
   qsub:write("echo \"# TASK_ID:  %d\"\n"%{id})
   qsub:write("echo \"# SERVER:   %s\"\n"%{SERVER})
