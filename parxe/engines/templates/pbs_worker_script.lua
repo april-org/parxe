@@ -23,7 +23,9 @@ local PORT      = os.getenv("PARXE_PORT")
 io = nil
 os = nil
 local cnn,task = mpi_utils.child_connect(SERVER, PORT, TASK_ID)
-local func, args, id = task.func, task.args, task.id assert(TASK_ID == id)
+local func, args, id = task.func, task.args, task.id
+print(TASK_ID, id)
+assert(TASK_ID == id)
 local ok,result = xpcall(func,debug.traceback,table.unpack(args))
 local err = nil
 if not ok then err,result=result,{} end
