@@ -86,7 +86,9 @@ local function child_connect(server_name, port_name, id)
   MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
   print("Connected")
   send(client, tostring(id), 0)
-  local task = util.deserialize(tostring(recv_with_client(client)))
+  local str = tostring(recv_with_client(client))
+  io.open("/home/experimentos/l.txt", "w"):write(str)
+  local task = util.deserialize(str)
   return client,task
 end
 
