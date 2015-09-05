@@ -136,7 +136,7 @@ function check_worker()
       pending_futures[r.id]._result_ = r.result or true
       if r.err then fprintf(io.stderr, r.err) end
     end
-  until not next(running_clients)
+  until not cli and not r
 end
 
 ----------------------------------------------------------------------------
