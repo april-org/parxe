@@ -75,12 +75,12 @@ local function check_any_result(running_clients, pending_futures)
   end
 end
 
-local function child_connect(server_name, id)
+local function child_connect(server_name, port_name, id)
   MPI.Init()
   local pub_name  = buffer.new_buffer(server_name)
-  local port_name = buffer.new_buffer(MPI.MAX_PORT_NAME+1)
+  local port_name = buffer.new_buffer(port_name)
   local client    = MPI.Comm()
-  MPI.Lookup_name(pub_name, INFO_NULL, port_name)
+  -- MPI.Lookup_name(pub_name, INFO_NULL, port_name)
   print("Port:", pub_name, port_name)
   MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
   print("Connected")
