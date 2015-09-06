@@ -15,18 +15,19 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local common    = require "parxe.common"
-local config    = require "parxe.config"
-local future    = require "parxe.future"
+local common = require "parxe.common"
+local config = require "parxe.config"
+local future = require "parxe.future"
 
 ---------------------------------------------------------------------------
-
-local f = io.popen("hostname")
-local HOSTNAME = f:read("*l") f:close()
-local TMPNAME  = os.tmpname()
+local JOB_TIMEOUT = 120 -- seconds
+local TMPNAME = os.tmpname()
 local HASH = TMPNAME:match("^.*lua_(.*)$")
-local CLEAR_TMP = true
-
+local HOSTNAME
+do
+  local f = io.popen("hostname")
+  HOSTNAME = f:read("*l") f:close()
+end
 ---------------------------------------------------------------------------
 
 local pbs,pbs_methods = class("parxe.engine.pbs")
@@ -47,33 +48,34 @@ local function execute_qsub(task, tmpname, f)
   local aux = io.popen("pwd")
   local pwd = aux:read("*l")
   aux:close()
-  local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
-  -- local qsub = io.open("/tmp/jarl_"..task.id..".txt", "w")
-  qsub:write("#PBS -l nice=19\n")
-  qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
-  if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
-  qsub:write("#PBS -m a\n")
-  qsub:write("#PBS -d %s\n"%{pwd})
-  qsub:write("#PBS -o %s\n"%{f.stdout})
-  qsub:write("#PBS -e %s\n"%{f.stderr})
-  for _,v in pairs(shell_lines) do qsub:write("%s\n"%{v}) end
-  qsub:write("cd $PBS_O_WORKDIR\n")
-  qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
-  qsub:write("export PARXE_TASKID=%d\n"%{task.id})
-  qsub:write("export PARXE_INPUT=%s\n"%{f.input})
-  qsub:write("export PARXE_OUTPUT=%s\n"%{f.output})
-  qsub:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
-  qsub:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
-  qsub:write("echo \"# DATE:     $(date)\"\n")
-  qsub:write("echo \"# TASKID:   %d\"\n"%{task.id})
-  qsub:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
-  qsub:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
-  qsub:write("echo \"# INPUT:    $PARXE_INPUT\"\n")
-  qsub:write("echo \"# OUTPUT:   $PARXE_OUTPUT\"\n")
-  qsub:write("%s -l parxe.engines.templates.pbs_worker_script -e ''\n"%{
+  local qsub_in,qsub_out = assert( io.popen2("qsub -N %s"%{resources.name or tmpname}) )
+  qsub_in:write("#PBS -l nice=19\n")
+  qsub_in:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
+  if resources.q then qsub_in:write("#PBS -q %s\n"%{resources.q}) end
+  qsub_in:write("#PBS -m a\n")
+  qsub_in:write("#PBS -d %s\n"%{pwd})
+  qsub_in:write("#PBS -o %s\n"%{f._stdout_})
+  qsub_in:write("#PBS -e %s\n"%{f._stderr_})
+  for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
+  qsub_in:write("cd $PBS_O_WORKDIR\n")
+  qsub_in:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
+  qsub_in:write("export PARXE_TASKID=%d\n"%{task.id})
+  qsub_in:write("export PARXE_INPUT=%s\n"%{f.input})
+  qsub_in:write("export PARXE_OUTPUT=%s\n"%{f.output})
+  qsub_in:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
+  qsub_in:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
+  qsub_in:write("echo \"# DATE:     $(date)\"\n")
+  qsub_in:write("echo \"# TASKID:   %d\"\n"%{task.id})
+  qsub_in:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
+  qsub_in:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
+  qsub_in:write("echo \"# INPUT:    $PARXE_INPUT\"\n")
+  qsub_in:write("echo \"# OUTPUT:   $PARXE_OUTPUT\"\n")
+  qsub_in:write("%s -l parxe.engines.templates.pbs_worker_script -e ''\n"%{
                resources.appname,
   })
-  qsub:close()
+  qsub_in:close()
+  f.jobid = qsub_out:read("*l")
+  qsub_out:close()
 end
 
 ---------------------------------------------------------------------------
@@ -92,12 +94,12 @@ function pbs_methods:execute(func, ...)
   local tmp = config.tmp()
   local tmpname = "%s/PX_%s_%05d_%s"%{tmp,HASH,task_id,os.date("%Y%m%d%H%M%S")}
   local f = future(check_worker)
-  f.task_id = task_id
-  f.tmpname = tmpname
-  f.stdout  = tmpname..".OU"
-  f.stderr  = tmpname..".ER"
-  f.input   = tmpname..".IN"
-  f.output  = tmpname..".RESULT"
+  f._stdout_ = tmpname..".OU"
+  f._stderr_ = tmpname..".ER"
+  f.input    = tmpname..".IN"
+  f.output   = tmpname..".RESULT"
+  f.task_id  = task_id
+  f.tmpname  = tmpname
   pending_futures[task_id] = f
   local task = { id=task_id, func=func, args=args }
   execute_qsub(task, tmpname, f)
@@ -126,39 +128,65 @@ end
 
 function pbs_methods:get_hash() return HASH end
 
-function pbs_methods:set_clear_tmp(v) CLEAR_TMP = v end
+----------------------------- check worker helpers ---------------------------
+
+local function finished_and_not_marked(f)
+  return not f.finish_time and not os.execute("qstat %s > /dev/null 2> /dev/null"%{f.jobid})
+end
+
+local function is_stdout_available(f)
+  local aux = io.open(f._stdout_)
+  if aux then aux:close() end
+  return aux
+end
+
+local function time_from_finish(f)
+  return f.finish_time and common.gettime() - f.finish_time or -math.huge
+end
+
+local function read_all(filename)
+  local f = io.open(filename)
+  if f then local all = f:read("*a") f:close() return all end
+  return "Unable to locate stderr file"
+end
+
+local function try_deserialize_output(f)
+  local f_ou,r = io.open(f.output),nil
+  if f_ou then
+    -- FIXME: Check sync problems in NFS environments
+    r = util.deserialize(f_ou)
+    f_ou:close()
+    os.remove(f.output)
+  end
+  f.output = nil
+  return r
+end
+
+local function assign_future(pending_futures, r)
+  pending_futures[r.id]._result_ = r.result or {false}
+  pending_futures[r.id]._err_ = r.err
+  pending_futures[r.id] = nil
+end
+
+------------------------ check worker function -------------------------------
 
 function check_worker()
   for task_id,f in pairs(pending_futures) do
-    local aux = io.open(f.stdout)
-    if aux then
-      aux:close()
-      local f_ou,r = io.open(f.output),nil
-      if f_ou then
-        -- FIXME: Check sync problems in NFS environments
-        r = util.deserialize(f_ou)
-        f_ou:close()
-        os.remove(f.output)
+    local r
+    if finished_and_not_marked(f) then f.finish_time = common.gettime() end
+    if not is_stdout_available(f) then
+      if time_from_finish(f) > JOB_TIMEOUT then
+        r = { id=task_id, err="Job output not available, check if working directory and tmp is shared with cluster nodes\n" }
       end
-      f.output = nil
-      if not r then
-        local g_er = assert( io.open(f.stderr) )
-        r = { id = task_id, err = g_er:read("*a") }
-        g_er:close()
-      else
-        assert(r.id == task_id)
+    else
+      r = try_deserialize_output(f)
+      if not r then r = { id = task_id, err = read_all(f._stderr_) }
+      else assert(r.id == task_id)
       end
-      pending_futures[r.id]._result_ = r.result or {true}
-      pending_futures[r.id]._err_ = r.err
-      if CLEAR_TMP then
-        local stdout = io.open(f.stdout)
-        pending_futures[r.id]._stdout_ = stdout:read("*a")
-        stdout:close()
-        os.remove(f.stdout)
-        os.remove(f.stderr)
-      end
-      pending_futures[r.id] = nil
-      if r.err then fprintf(io.stderr, "%s", r.err) end
+    end
+    if r then
+      assign_future(pending_futures, r)
+      if r.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", r.id, r.err) end
     end
   end
 end

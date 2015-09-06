@@ -30,8 +30,8 @@ local function dummy_function() end
 -------------------------------------------------------------------------
 
 class.extend_metamethod(future, "__tostring", function(self)
-                          if f:ready() then
-                            local err = f:get_error()
+                          if self._result_ then
+                            local err = self:get_stderr()
                             if err then return "future: ready with some warnings or errors" end
                             return "future: ready without errors or warnings"
                           end
@@ -42,15 +42,18 @@ function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
 end
 
+function future:destructor()
+  if self._stdout_ then os.remove(self._stdout_) end
+  if self._stderr_ then os.remove(self._stderr_) end
+end
+
 function future_methods:wait(timeout, sleep_step)
-  self:_do_work_()
   timeout = timeout or math.huge
   sleep_step = sleep_step or config.wait_step()
   local util_sleep = util.sleep
   local t0_sec = gettime()
   while not self:ready() and elapsed_time(t0_sec) < timeout do
     util_sleep(sleep_step)
-    self:_do_work_()
   end
 end
 
@@ -59,15 +62,25 @@ function future_methods:get()
   return self._result_
 end
 
-function future_methods:get_error()
+function future_methods:get_stderr()
   if not self._result_ then self:wait() end
-  if self._err_ and #self._err_ > 0 then return self._err_ end
-  return nil
+  local err
+  if not self._stderr_ then
+    err = self._err_
+  else
+    local f = io.open(self._stderr_)
+    err = f:read("*a")
+    f:close()
+  end
+  if err and #err > 0 then return err end
 end
 
 function future_methods:get_stdout()
   if not self._result_ then self:wait() end
-  return self._stdout_
+  local f = io.open(self._stdout_)
+  local out = f:read("*a")
+  f:close()
+  return out
 end
 
 function future_methods:ready()
@@ -83,6 +96,18 @@ end
 
 -------------------------------------------------------------------------
 
+local all_get_stdout = function(self)
+  local tbl = {}
+  for i,f in ipairs(self.data) do tbl[i] = f:get_stdout() end
+  return tbl
+end
+
+local all_get_stderr = function(self)
+  local tbl = {}
+  for i,f in ipairs(self.data) do tbl[i] = f:get_stderr() end
+  return tbl
+end
+
 local all_do_work = function(self)
   local all_ready = true
   for i,f in ipairs(self.data) do
@@ -91,8 +116,6 @@ local all_do_work = function(self)
   if not all_ready then return false end
   -- the code below is executed once all futures are ready
   local result = {}
-  local stdout = {}
-  local err    = {}
   for i,f in ipairs(self.data) do
     local values = f:get()
     if type(values):find("^matrix") then
@@ -105,16 +128,14 @@ local all_do_work = function(self)
       end)
       if not ok then result[#result+1]= values end
     end
-    err[#err+1] = f:get_error()
-    stdout[#stdout+1] = f:get_stdout()
   end
   self._result_ = result
-  self._err_ = table.concat(err, "\n")
-  self._stdout_ = table.concat(stdout, "\n")
 end
 
 function future.all(tbl)
   local f = future(all_do_work)
+  f.get_stdout = all_get_stdout
+  f.get_stderr = all_get_stderr
   f.data = tbl
   return f
 end
