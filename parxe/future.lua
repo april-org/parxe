@@ -29,6 +29,15 @@ local function dummy_function() end
 
 -------------------------------------------------------------------------
 
+class.extend_metamethod(future, "__tostring", function(self)
+                          if f:ready() then
+                            local err = f:get_error()
+                            if err then return "future: ready with some warnings or errors" end
+                            return "future: ready without errors or warnings"
+                          end
+                          return "future: not ready, use wait or any get method"
+end)
+
 function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
 end
@@ -47,13 +56,13 @@ end
 
 function future_methods:get()
   if not self._result_ then self:wait() end
-  if not self._err_ then return self._result_ end
-  return nil,self:get_error()
+  return self._result_
 end
 
 function future_methods:get_error()
   if not self._result_ then self:wait() end
-  return self._err_
+  if self._err_ and #self._err_ > 0 then return self._err_ end
+  return nil
 end
 
 function future_methods:get_stdout()
@@ -82,6 +91,8 @@ local all_do_work = function(self)
   if not all_ready then return false end
   -- the code below is executed once all futures are ready
   local result = {}
+  local stdout = {}
+  local err    = {}
   for i,f in ipairs(self.data) do
     local values = f:get()
     if type(values):find("^matrix") then
@@ -94,8 +105,12 @@ local all_do_work = function(self)
       end)
       if not ok then result[#result+1]= values end
     end
+    err[#err+1] = f:get_error()
+    stdout[#stdout+1] = f:get_stdout()
   end
   self._result_ = result
+  self._err_ = table.concat(err, "\n")
+  self._stdout_ = table.concat(stdout, "\n")
 end
 
 function future.all(tbl)
