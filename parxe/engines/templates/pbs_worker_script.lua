@@ -15,14 +15,21 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local mpi_utils = require "parxe.mpi_utils"
-local PORT      = os.getenv("PARXE_PORT")
-local TASK_ID   = tonumber(os.getenv("PARXE_TASKID"))
---
-local cnn,task = mpi_utils.child_connect(PORT, TASK_ID)
-local func, args, id = task.func, task.args, task.id
-assert(TASK_ID == id)
-local ok,result = xpcall(func,debug.traceback,table.unpack(args))
-local err = nil
-if not ok then err,result=result,{} end
-mpi_utils.task_done(cnn, {id=id, result=result, err=err})
+local px = require "parxe"
+local TASKID = tonumber( os.getenv("PARXE_TASKID") )
+local INPUT  = assert( os.getenv("PARXE_INPUT") )
+local OUTPUT = assert( os.getenv("PARXE_OUTPUT") )
+local function RUN_WORKER(TASKID, INPUT, OUTPUT)
+  local f = io.open(INPUT)
+  -- retry because of NFS sync problems
+  while not f do f = io.open(INPUT) util.sleep(0.1) end
+  local task = assert( util.deserialize(f) )
+  f:close() os.remove(INPUT)
+  local func, args, id = task.func, task.args, task.id
+  assert(TASKID == id)
+  local ok,result = xpcall(func,debug.traceback,table.unpack(args))
+  local err = nil
+  if not ok then err,result=result,{} end
+  util.serialize({id=id, result=result, err=err}, OUTPUT)
+end
+RUN_WORKER(TASKID, INPUT, OUTPUT)

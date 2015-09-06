@@ -15,9 +15,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local px     = require "parxe"
-local engine = require "parxe.engines.seq"
-px.config.set_engine(engine) -- not necessary
+local px = require "parxe"
+px.config.set_engine("seq")
 
 local f = px.map(iterator.range(1024):table(), function(x) return 2*x end)
 local r = f:get()

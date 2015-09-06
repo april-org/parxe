@@ -18,18 +18,13 @@
 local common    = require "parxe.common"
 local config    = require "parxe.config"
 local future    = require "parxe.future"
-local mpi_utils = require "parxe.mpi_utils"
 
 ---------------------------------------------------------------------------
 
 local f = io.popen("hostname")
 local HOSTNAME = f:read("*l") f:close()
 local TMPNAME  = os.tmpname()
-local cnn      = mpi_utils.run_server()
-local PORT     = tostring(cnn.port_name)
-for i=1,#PORT do
-  if PORT:sub(i,i):byte() == 0 then PORT = PORT:sub(1,i-1) break end
-end
+local HASH = TMPNAME:match("^.*lua_(.*)$")
 
 ---------------------------------------------------------------------------
 
@@ -39,40 +34,41 @@ local singleton
 ---------------------------------------------------------------------------
 
 local check_worker
-local in_dict = {}
 local pending_futures = {}
-local allowed_resources = { mem=true, q=true, name=true, omp=true, mpiexec=true,
-                            appname=true }
-local resources = { mpiexec="mpiexec",
-                    appname="april-ann" }
+local allowed_resources = { mem=true, q=true, name=true, omp=true, appname=true }
+local resources = { appname="april-ann" }
 local shell_lines = {}
 
 ---------------------------------------------------------------------------
 
-local function execute_qsub(id, tmp, tmpname)
+local function execute_qsub(task, tmp, tmpname, f)
+  util.serialize(task, f.input)
   local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
+  -- local qsub = io.open("/tmp/jarl_"..task.id..".txt", "w")
   qsub:write("#PBS -l nice=19\n")
   qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
   if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
   qsub:write("#PBS -m a\n")
   qsub:write("#PBS -d %s\n"%{tmp})
-  qsub:write("#PBS -o %s.OU\n"%{tmpname})
-  qsub:write("#PBS -e %s.ER\n"%{tmpname})
+  qsub:write("#PBS -o %s\n"%{f.stdout})
+  qsub:write("#PBS -e %s\n"%{f.stderr})
   for _,v in pairs(shell_lines) do qsub:write("%s\n"%{v}) end
   qsub:write("cd $PBS_O_WORKDIR\n")
   qsub:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
-  qsub:write("export PARXE_TASKID=%d\n"%{id})
-  qsub:write("export PARXE_PORT='%s'\n"%{PORT})
+  qsub:write("export PARXE_TASKID=%d\n"%{task.id})
+  qsub:write("export PARXE_INPUT=%s\n"%{f.input})
+  qsub:write("export PARXE_OUTPUT=%s\n"%{f.output})
   qsub:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
   qsub:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
   qsub:write("echo \"# DATE:     $(date)\"\n")
+  qsub:write("echo \"# TASKID:   %d\"\n"%{task.id})
   qsub:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
-  qsub:write("echo \"# TASK_ID:  %d\"\n"%{id})
-  qsub:write("echo \"# PORT:     '%s'\"\n"%{PORT})
-  qsub:write("echo \"# MPIEXEC:  %s\"\n"%{resources.mpiexec})
   qsub:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
-  qsub:write("%s %s -l parxe.engines.templates.pbs_worker_script -e 'print(\"# DONE\")'"%{resources.mpiexec,
-                                                                                          resources.appname})
+  qsub:write("echo \"# INPUT:    $PARXE_INPUT\"\n")
+  qsub:write("echo \"# OUTPUT:   $PARXE_OUTPUT\"\n")
+  qsub:write("%s -l parxe.engines.templates.pbs_worker_script -e ''\n"%{
+               resources.appname,
+  })
   qsub:close()
 end
 
@@ -82,21 +78,25 @@ function pbs:constructor()
 end
 
 function pbs:destructor()
-  mpi_utils.stop_server(cnn)
   os.remove(TMPNAME)
+  util.wait()
 end
 
 function pbs_methods:execute(func, ...)
   local args    = table.pack(...)
   local task_id = common.next_task_id()
   local tmp = config.tmp()
-  local tmpname = "%s/PARXE_TASK_%d_%s"%{tmp,task_id,os.date("%Y%m%d%H%M%S")}
+  local tmpname = "%s/PX_%s_%05d_%s"%{tmp,HASH,task_id,os.date("%Y%m%d%H%M%S")}
   local f = future(check_worker)
   f.task_id = task_id
   f.tmpname = tmpname
+  f.stdout  = tmpname..".OU"
+  f.stderr  = tmpname..".ER"
+  f.input   = tmpname..".IN"
+  f.output  = tmpname..".RESULT"
   pending_futures[task_id] = f
-  in_dict[task_id] = { id=task_id, func=func, args=args }
-  execute_qsub(task_id, tmp, tmpname)
+  local task = { id=task_id, func=func, args=args }
+  execute_qsub(task, tmp, tmpname, f)
   return f
 end
 
@@ -120,23 +120,34 @@ function pbs_methods:append_shell_line(value)
   table.insert(shell_lines, value)
 end
 
-local running_clients = {}
+function pbs_methods:get_hash() return HASH end
+
 function check_worker()
-  repeat
-    local cli = mpi_utils.accept_connection(cnn)
-    if cli then
-      local task_id = mpi_utils.receive_task_id(cnn, cli)
-      local task = in_dict[task_id]
-      in_dict[task_id] = nil
-      mpi_utils.send_task(cli, task)
-      running_clients[task_id] = cli
+  for task_id,f in pairs(pending_futures) do
+    local aux = io.open(f.stdout)
+    if aux then
+      aux:close()
+      local f_ou,r = io.open(f.output),nil
+      if f_ou then
+        -- FIXME: Check sync problems in NFS environments
+        r = util.deserialize(f_ou)
+        f_ou:close()
+        os.remove(f.output)
+      end
+      f.output = nil
+      if not r then
+        local g_er = assert( io.open(f.stderr) )
+        r = { id = task_id, err = g_er:read("*a") }
+        g_er:close()
+      else
+        assert(r.id == task_id)
+      end
+      pending_futures[r.id]._result_ = r.result or {true}
+      pending_futures[r.id]._err_ = r.err
+      pending_futures[r.id] = nil
+      if r.err then fprintf(io.stderr, "%s", r.err) end
     end
-    local r = mpi_utils.check_any_result(running_clients)
-    if r then
-      pending_futures[r.id]._result_ = r.result or true
-      if r.err then fprintf(io.stderr, r.err) end
-    end
-  until not cli and not r
+  end
 end
 
 ----------------------------------------------------------------------------

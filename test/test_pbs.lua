@@ -15,10 +15,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
--- $ mpirun -nameserver esainet01 april-ann test/test_pbs.lua
-local px     = require "parxe"
-local engine = require "parxe.engines.pbs"
-px.config.set_engine(engine)
+local px = require "parxe"
+px.config.set_engine("pbs")
 -- mapping a table of data
 local f1 = px.map(iterator.range(1024):table(), function(x) return 2*x end)
 -- mapping a matrix

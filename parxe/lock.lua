@@ -21,15 +21,21 @@ local io_open    = io.open
 local os_remove  = os.remove
 local os_tmpname = os.tmpname
 
-function lock:constructor()
-  local tmpname = os_tmpname()
+function lock:constructor(_tmpname_)
+  if _tmpname_ then io.open(_tmpname_, "w"):close() end
+  local tmpname = _tmpname_ or os_tmpname()
   self.tmpname  = tmpname
   self.name     = tmpname .. ".lock"
 end
 
 function lock:destructor()
-  os_remove(self.tmpname)
-  os_remove(self.name)
+  os_remove(self.tmpname and self.tmpname)
+  os_remove(self.name and self.name)
+end
+
+function lock_methods:destroy()
+  self.tmpname = nil
+  self.name = nil
 end
 
 function lock_methods:check()

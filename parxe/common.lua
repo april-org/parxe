@@ -35,6 +35,16 @@ class.extend_metamethod(range_object, "__ipairs",
 
 -----------------------------------------------------------------------------
 
+local function compute_task_split(object, engine)
+  local config = require "parxe.config"
+  local max_number_tasks = config.max_number_tasks()
+  local min_task_len = config.min_task_len()
+  local N = (type(object)=="number" and object) or #object
+  local M = math.min(engine:get_max_tasks() or N, max_number_tasks)
+  local K = math.max(math.ceil(N/M), min_task_len)
+  return N,M,K
+end
+
 local function deserialize(f)
   local config = require "parxe.config"
   local line = f:read("*l") if not line then return end
@@ -101,6 +111,7 @@ local function user_conf(filename, ...)
 end
 
 return {
+  compute_task_split = compute_task_split,
   deserialize = deserialize,
   gettime = gettime,
   make_serializer = make_serializer,

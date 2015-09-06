@@ -22,6 +22,7 @@ local ANY_SOURCE = MPI.ANY_SOURCE
 local COMM_WORLD = MPI.COMM_WORLD
 local INFO_NULL  = MPI.INFO_NULL
 local MAX_PORT_NAME = MPI.MAX_PORT_NAME
+local SUCCESS = MPI.SUCCESS
 
 signal.register(signal.SIGALRM, function() end)
 signal.register(signal.SIGINT, function() error("Received SIGINT") end)
@@ -89,19 +90,24 @@ local function check_any_result(running_clients)
   end
 end
 
-local function child_connect(port_name, id)
+local function get_task(port_name, id)
   MPI.Init()
-  print("CONNECTION", port_name, id)
   local port_name = buffer.new_buffer(port_name)
   local client    = MPI.Comm()
-  MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
-  print("CONNECTED")
+  local ret = MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+  local i = 0
+  while ret ~= SUCCESS and i < 1000 do
+    util.sleep(1.0)
+    ret = MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+    i=i+1
+  end
   send(client, tostring(id), 0)
-  print("ID SENDED")
   local str = tostring(recv_with_client(client))
   print("TASK RECEIVED")
   local task = util.deserialize(str)
-  return client,task
+  MPI.Comm_disconnect(client)
+  print("DISCONNECTED")
+  return task,port_name
 end
 
 local function receive_task_id(server, worker)
@@ -109,15 +115,15 @@ local function receive_task_id(server, worker)
   return task_id
 end
 
-local function run_server()
+local function send_task(cli, task)
+  send(cli, util.serialize(task), 0)
+end
+
+local function start_server()
   MPI.Init()
   local port_name = buffer.new_buffer(MAX_PORT_NAME+1)
   MPI.Open_port(INFO_NULL, port_name)
   return { port_name=port_name }
-end
-
-local function send_task(cli, task)
-  send(cli, util.serialize(task), 0)
 end
 
 local function stop_server(cnn)
@@ -125,22 +131,31 @@ local function stop_server(cnn)
   MPI.Finalize()
 end
 
-local function task_done(cnn, result)
-  send(cnn, util.serialize(result), 0)
-  print("DISCONNECTING")
-  MPI.Comm_disconnect(cnn)
-  print("FINALIZING")
+local function task_done(port_name, result)
+  MPI.Init()
+  local port_name = buffer.new_buffer(port_name)
+  local client = MPI.Comm()
+  local ret = MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+  local i = 0
+  while ret ~= SUCCESS and i < 1000 do
+    util.sleep(1.0)
+    ret = MPI.Comm_connect(port_name, INFO_NULL, 0, COMM_WORLD, client)
+    i=i+1
+  end
+  send(client, util.serialize(result), 0)
+  print("RESULT SENDED")
+  MPI.Comm_disconnect(client)
+  print("DISCONNECTED")
   MPI.Finalize()
-  print("GOOD BYE!")
 end
 
 return {
   accept_connection = accept_connection,
   check_any_result = check_any_result,
-  child_connect = child_connect,
-  disconnect = disconnect,
+  get_task = get_task,
   receive_task_id = receive_task_id,
-  run_server = run_server,
   send_task = send_task,
+  start_server = start_server,
+  stop_server = stop_server,
   task_done = task_done,
 }

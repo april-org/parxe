@@ -47,7 +47,13 @@ end
 
 function future_methods:get()
   if not self._result_ then self:wait() end
+  if self._err_ then error(self._err_) end
   return self._result_
+end
+
+function future_methods:get_error()
+  if not self._result_ then self:wait() end
+  return self._err_
 end
 
 function future_methods:ready()
