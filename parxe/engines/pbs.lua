@@ -25,6 +25,7 @@ local f = io.popen("hostname")
 local HOSTNAME = f:read("*l") f:close()
 local TMPNAME  = os.tmpname()
 local HASH = TMPNAME:match("^.*lua_(.*)$")
+local CLEAR_TMP = true
 
 ---------------------------------------------------------------------------
 
@@ -122,6 +123,8 @@ end
 
 function pbs_methods:get_hash() return HASH end
 
+function pbs_methods:set_clear_tmp(v) CLEAR_TMP = v end
+
 function check_worker()
   for task_id,f in pairs(pending_futures) do
     local aux = io.open(f.stdout)
@@ -145,6 +148,10 @@ function check_worker()
       pending_futures[r.id]._result_ = r.result or {true}
       pending_futures[r.id]._err_ = r.err
       pending_futures[r.id] = nil
+      if CLEAR_TMP then
+        os.remove(f.stdout)
+        os.remove(f.stderr)
+      end
       if r.err then fprintf(io.stderr, "%s", r.err) end
     end
   end
