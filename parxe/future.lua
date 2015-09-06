@@ -47,13 +47,18 @@ end
 
 function future_methods:get()
   if not self._result_ then self:wait() end
-  if self._err_ then error(self._err_) end
-  return self._result_
+  if not self._err_ then return self._result_ end
+  return nil,self:get_error()
 end
 
 function future_methods:get_error()
   if not self._result_ then self:wait() end
   return self._err_
+end
+
+function future_methods:get_stdout()
+  if not self._result_ then self:wait() end
+  return self._stdout_
 end
 
 function future_methods:ready()
@@ -80,11 +85,14 @@ local all_do_work = function(self)
   for i,f in ipairs(self.data) do
     local values = f:get()
     if type(values):find("^matrix") then
-      result[i] = values
+      result[#result+1] = values
     else
-      for _,v in ipairs(values) do
-        table.insert(result, v)
-      end
+      local ok = pcall(function()
+          for _,v in ipairs(values) do
+            table.insert(result, v)
+          end
+      end)
+      if not ok then result[#result+1]= values end
     end
   end
   self._result_ = result

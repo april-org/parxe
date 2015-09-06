@@ -42,15 +42,18 @@ local shell_lines = {}
 
 ---------------------------------------------------------------------------
 
-local function execute_qsub(task, tmp, tmpname, f)
+local function execute_qsub(task, tmpname, f)
   util.serialize(task, f.input)
+  local aux = io.popen("pwd")
+  local pwd = aux:read("*l")
+  aux:close()
   local qsub = io.popen("qsub -N %s > /dev/null"%{resources.name or tmpname}, "w")
   -- local qsub = io.open("/tmp/jarl_"..task.id..".txt", "w")
   qsub:write("#PBS -l nice=19\n")
   qsub:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
   if resources.q then qsub:write("#PBS -q %s\n"%{resources.q}) end
   qsub:write("#PBS -m a\n")
-  qsub:write("#PBS -d %s\n"%{tmp})
+  qsub:write("#PBS -d %s\n"%{pwd})
   qsub:write("#PBS -o %s\n"%{f.stdout})
   qsub:write("#PBS -e %s\n"%{f.stderr})
   for _,v in pairs(shell_lines) do qsub:write("%s\n"%{v}) end
@@ -97,7 +100,7 @@ function pbs_methods:execute(func, ...)
   f.output  = tmpname..".RESULT"
   pending_futures[task_id] = f
   local task = { id=task_id, func=func, args=args }
-  execute_qsub(task, tmp, tmpname, f)
+  execute_qsub(task, tmpname, f)
   return f
 end
 
@@ -147,11 +150,14 @@ function check_worker()
       end
       pending_futures[r.id]._result_ = r.result or {true}
       pending_futures[r.id]._err_ = r.err
-      pending_futures[r.id] = nil
       if CLEAR_TMP then
+        local stdout = io.open(f.stdout)
+        pending_futures[r.id]._stdout_ = stdout:read("*a")
+        stdout:close()
         os.remove(f.stdout)
         os.remove(f.stderr)
       end
+      pending_futures[r.id] = nil
       if r.err then fprintf(io.stderr, "%s", r.err) end
     end
   end
