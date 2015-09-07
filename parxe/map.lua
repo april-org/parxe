@@ -43,14 +43,14 @@ local px_map_bunch = function(map_func, slice_object, ...)
 end
 
 -- object needs should be a number or an iterable using # and [] operators
-local private_map = function(bunch, map_func, object, ...)
+local function private_map(bunch, map_func, object, ...)
+  local slice_map = bunch and px_map_bunch or px_slice_map
   if class.is_a(object, future) then
-    error("Not implemented for a future as input")
+    return future.conditioned(bind(slice_map, map_func), object, ...)
   else
     local engine   = config.engine()
     local futures  = {}
     local N,M,K    = common.compute_task_split(object, engine)
-    local slice_map = bunch and px_map_bunch or px_slice_map
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end

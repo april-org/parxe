@@ -37,10 +37,9 @@ end
 -- object needs should be a number or an iterable using # and [] operators
 local function px_reduce(reduce_func, object, ...)
   local arg = table.pack(...)
-  local init = arg[#arg]
-  assert(init ~= nil, "Needs a init object as last argument")
+  assert(arg.n > 0, "Needs an init value as last argument")
   if class.is_a(object, future) then
-    error("Not implemented for a future as input")
+    return future.conditioned(bind(px_slice_reduce, reduce_func), object, ...)
   else
     local engine   = config.engine()
     local futures  = {}
