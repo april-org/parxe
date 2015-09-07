@@ -25,7 +25,7 @@ local print          = print
 local range_object   = common.range_object
 local take_slice     = common.take_slice
 
-local px_slice_map = function(slice_object, map_func, ...)
+local px_slice_map = function(map_func, slice_object, ...)
   local result = {}
   for i=1,#slice_object do result[i] = map_func(slice_object[i], ...) end
   april_assert(#result == 0 or #result == #slice_object,
@@ -34,7 +34,7 @@ local px_slice_map = function(slice_object, map_func, ...)
   return result
 end
 
-local px_map_bunch = function(slice_object, map_func, ...)
+local px_map_bunch = function(map_func, slice_object, ...)
   local result = map_func(slice_object, ...)
   april_assert(not result or #result == #slice_object,
                "Incorrect number of returned values, expected %d, found %d",
@@ -43,7 +43,7 @@ local px_map_bunch = function(slice_object, map_func, ...)
 end
 
 -- object needs should be a number or an iterable using # and [] operators
-local private_map = function(object, bunch, map_func, ...)
+local private_map = function(bunch, map_func, object, ...)
   if class.is_a(object, future) then
     error("Not implemented for a future as input")
   else
@@ -55,20 +55,20 @@ local private_map = function(object, bunch, map_func, ...)
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end
       futures[i] = engine:execute(slice_map,
-                                  take_slice(object, a, b),
                                   map_func,
+                                  take_slice(object, a, b),
                                   ...)
     end
     return future.all(futures)
   end
 end
 
-local px_map = function(object, ...)
-  return private_map(object, false, ...)
+local px_map = function(...)
+  return private_map(false, ...)
 end
 
-local px_map_bunch = function(object, ...)
-  return private_map(object, true, ...)
+local px_map_bunch = function(...)
+  return private_map(true, ...)
 end
 
 return setmetatable(

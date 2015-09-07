@@ -30,6 +30,7 @@ function seq:destructor()
 end
 
 function seq_methods:execute(func, ...)
+  os.execute("cd "..config.wd())
   local f = future()
   f._result_ = func(...)
   return f

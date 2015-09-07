@@ -103,11 +103,17 @@ local function take_slice(obj, a, b)
 end
 
 local function user_conf(filename, ...)
+  local f,CONF
   local HOME = os.getenv("HOME")
   if HOME then
-    local CONF = HOME.."/.parxe/default/" .. filename
-    local f = io.open(CONF) if f then f:close() loadfile(CONF)(...) end
+    CONF = HOME.."/.parxe/default/" .. filename
+    f = io.open(CONF)
   end
+  if not f then
+    CONF = "/etc/parxe/default/" .. filename
+    f = io.open(CONF)
+  end
+  if f then f:close() loadfile(CONF)(...) end
 end
 
 return {

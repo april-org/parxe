@@ -26,6 +26,17 @@ local max_number_tasks = 64
 local min_task_len = 32
 local tmp = "/tmp"
 local wait_step = 0.1
+local working_directory
+--
+local update_wd
+do
+  update_wd = function()
+    local aux = io.popen("pwd")
+    working_directory = aux:read("*l")
+    aux:close()
+  end
+end
+update_wd()
 
 -- interface table to retrieve and update config variables
 local api
@@ -38,6 +49,7 @@ api = {
   min_task_len = function() return min_task_len end,
   tmp = function() return tmp end,
   wait_step = function() return wait_step end,
+  wd = function() return working_directory end,
   --
   set_block_size = function(n) assert(type(n) == "number") block_size = n end,
   set_engine = function(str) assert(type(str) == "string") engine = require ("parxe.engines."..str) end,
@@ -46,5 +58,13 @@ api = {
   set_min_task_len = function(n) assert(type(n) == "number") min_task_len = n end,
   set_tmp = function(str) assert(type(str) == "string") tmp = str end,
   set_wait_step = function(n) assert(type(n) == "number") wait_step = n end,
+  set_wd = function(str) assert(type(str) == "string") os.execute("cd "..str) update_wd() end,
+  --
+  update = function(dict)
+    for key,value in dict do
+      local f = april_assert(api["set_"..key], "Unknown key %s", key)
+      f(value)
+    end
+  end
 }
 return api

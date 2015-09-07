@@ -142,4 +142,24 @@ end
 
 -------------------------------------------------------------------------
 
+local conditioned_do_work = function(self)
+  if self.data:ready() then
+    local data = self.func( self.data:get(), table.unpack(self.args) )
+    if not class.is_a(data, future) then
+      self._result_ = data
+    end
+  end
+end
+
+function future.conditioned(func, other, ...)
+  assert(class.is_a(other, future), "Needs a future as second argument")
+  local f = future(conditioned_do_work)
+  f.func = func
+  f.data = other
+  f.args = table.pack(...)
+  return f
+end
+
+-------------------------------------------------------------------------
+
 return future

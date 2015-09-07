@@ -45,19 +45,15 @@ local shell_lines = {}
 
 local function execute_qsub(task, tmpname, f)
   util.serialize(task, f.input)
-  local aux = io.popen("pwd")
-  local pwd = aux:read("*l")
-  aux:close()
   local qsub_in,qsub_out = assert( io.popen2("qsub -N %s"%{resources.name or tmpname}) )
   qsub_in:write("#PBS -l nice=19\n")
   qsub_in:write("#PBS -l nodes=1:ppn=%d,mem=%s\n"%{resources.omp or 1, resources.mem or "1g"})
   if resources.q then qsub_in:write("#PBS -q %s\n"%{resources.q}) end
   qsub_in:write("#PBS -m a\n")
-  qsub_in:write("#PBS -d %s\n"%{pwd})
   qsub_in:write("#PBS -o %s\n"%{f._stdout_})
   qsub_in:write("#PBS -e %s\n"%{f._stderr_})
   for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
-  qsub_in:write("cd $PBS_O_WORKDIR\n")
+  qsub_in:write("cd %s\n"%{task.wd})
   qsub_in:write("export OMP_NUM_THREADS=%d\n"%{resources.omp or 1})
   qsub_in:write("export PARXE_TASKID=%d\n"%{task.id})
   qsub_in:write("export PARXE_INPUT=%s\n"%{f.input})
@@ -101,7 +97,7 @@ function pbs_methods:execute(func, ...)
   f.task_id  = task_id
   f.tmpname  = tmpname
   pending_futures[task_id] = f
-  local task = { id=task_id, func=func, args=args }
+  local task = { id=task_id, func=func, args=args, wd=config.wd() }
   execute_qsub(task, tmpname, f)
   return f
 end

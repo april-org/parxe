@@ -40,7 +40,8 @@ do
     -- remove from global table sensible functions
     while true do
       local task = deserialize(stream) if not task then break end
-      local func, args, id = task.func, task.args, task.id
+      local func, args, id, wd = task.func, task.args, task.id, task.wd
+      os.execute("cd "..wd)
       -- FIXME: MEMORY LEAK POSSIBLE WHEN ERROR IS PRODUCED
       local ok,result = xpcall(func,debug.traceback,table.unpack(args))
       local err = nil
@@ -105,8 +106,8 @@ do
       execute_next()
       return #out_queue>0
     end
-    local function push_task(id, func, args)
-      table.insert(in_queue, {func=func, args=args, id=id})
+    local function push_task(id, func, args, wd)
+      table.insert(in_queue, {func=func, args=args, id=id, wd=wd})
       read_next_result()
       execute_next()
     end
@@ -166,7 +167,7 @@ function fork_methods:execute(func, ...)
   local f = future(check_worker)
   f.task_id = task_id
   pending_futures[task_id] = f
-  scheduler.push_task(task_id, func, args)
+  scheduler.push_task(task_id, func, args, config.wd())
   return f
 end
 

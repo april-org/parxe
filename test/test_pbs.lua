@@ -18,24 +18,30 @@
 local px = require "parxe"
 px.config.set_engine("pbs")
 -- mapping a table of data
-local f1 = px.map(iterator.range(1024):table(), function(x) return 2*x end)
+local f1 = px.map(function(x) return 2*x end, iterator.range(1024):table())
 -- mapping a matrix
-local f2 = px.map(matrix(1024,20):linspace(), function(x) return stats.amean(x,1) end)
+local f2 = px.map(function(x) return stats.amean(x,1) end, matrix(1024,20):linspace())
 -- mapping a range of 1024 numbers
-local f3 = px.map(1024, function(x) return 2*x end)
+local f3 = px.map(function(x) return 2*x end, 1024)
 -- mapping a range of 1024 in bunches
-local f4 = px.map.bunch(1024,
-                        function(obj)
+local f4 = px.map.bunch(function(obj)
                           local n,a,b = #obj,obj[1],obj[#obj]
                           local m = matrix(#obj,20):linspace((a-1)*20+1,b*20)
                           return stats.amean(m,2)
-end)
+                        end, 1024)
 -- mapping a matrix in bunches
-local f5 = px.map.bunch(matrix(1024,20):linspace(),
-                        function(x) return stats.amean(x,2) end)
+local f5 = px.map.bunch(function(x) return stats.amean(x,2) end, matrix(1024,20):linspace())
 --
 print(table.concat(f1:get(), ","))
 print(matrix.join(0,f2:get()))
 print(table.concat(f3:get(), ","))
 print(matrix.join(1,f4:get()))
 print(matrix.join(1,f5:get()))
+
+local f = px.reduce(function(a,x) return a+x end, iterator.range(1024):table(), 0)
+local r = iterator(f:get()):reduce(math.add, 0)
+print(r)
+
+local f = px.reduce.self_distributive(function(a,x) return a+x end, iterator.range(1024):table(), 0)
+local r = f:get()
+print(r)

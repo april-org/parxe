@@ -18,16 +18,24 @@
 local px = require "parxe"
 px.config.set_engine("seq")
 
-local f = px.map(iterator.range(1024):table(), function(x) return 2*x end)
+local f = px.map(function(x) return 2*x end, iterator.range(1024):table())
 local r = f:get()
 pprint(r)
 
 local m = matrix(1024,20):linspace()
 
-local f = px.map(m, function(x) return 2*x end)
+local f = px.map(function(x) return 2*x end, m)
 local r = matrix.join(0,f:get())
 print(r)
 
-local f = px.map.bunch(m, function(x) return 2*x end)
+local f = px.map.bunch(function(x) return 2*x end, m)
 local r = matrix.join(1,f:get())
+print(r)
+
+local f = px.reduce(function(a,x) return a+x end, iterator.range(1024):table(), 0)
+local r = iterator(f:get()):reduce(math.add, 0)
+print(r)
+
+local f = px.reduce.self_distributive(function(a,x) return a+x end, iterator.range(1024):table(), 0)
+local r = f:get()
 print(r)

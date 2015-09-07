@@ -20,9 +20,7 @@ local parxe = {
   _NAME     = "parxe",
   _VERSION  = "0.1",
   config    = require "parxe.config".init(),
-  export    = require "parxe.export",
   --
-  filter    = require "parxe.filter",
   map       = require "parxe.map",
   reduce    = require "parxe.reduce",
 }
