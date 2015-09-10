@@ -15,8 +15,6 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
------------------------------------------------------------------------------
-
 local range_object,range_object_methods = class("parxe.range_object")
 function range_object:constructor(a,b) self.a = a self.b = b self.n = b-a+1 end
 function range_object_methods:ctor_name() return 'class.find("parxe.range_object")' end
@@ -49,11 +47,12 @@ local function deserialize(f)
   local config = require "parxe.config"
   local line = f:read("*l") if not line then return end
   local n = tonumber(line)
+  local bsize = config.block_size()
   return util.deserialize{
     read=function(_,m)
       if n > 0 then
         m = math.min(n, m)
-        local b = math.min(m, config.block_size())
+        local b = math.min(m, bsize)
         n = n - b
         return assert( f:read(b) )
       end

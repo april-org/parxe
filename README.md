@@ -1,4 +1,5 @@
 # PARXE
+
 PARalel eXecution Engine (PARXE) for [APRIL-ANN](https://github.com/pakozm/april-ann)
 
 PARXE is an extension written in Lua for APRIL-ANN and similar tools (it can be
@@ -49,4 +50,18 @@ Other reducers can be more complicated:
 > y  = iterator(x):reduce(math.add)
 > print(y)
 528 1552 2576 3600 4624 5648 6672 7696
+```
+
+## Dependencies
+
+The "pbs" engine needs the installation of
+[Xemsg!](https://github.com/pakozm/xemsg) a binding of
+[nanomsg](http://nanomsg.org/) for Lua. So, first you need to have installed
+libnanomsg-dev in your system and then execute:
+
+```
+$ git clone https://github.com/pakozm/xemsg.git
+$ cd xemsg
+$ make LUAPKG=lua5.2
+$ sudo make install
 ```

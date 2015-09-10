@@ -16,20 +16,42 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 local px = require "parxe"
-local TASKID = tonumber( os.getenv("PARXE_TASKID") )
-local INPUT  = assert( os.getenv("PARXE_INPUT") )
-local OUTPUT = assert( os.getenv("PARXE_OUTPUT") )
-local function RUN_WORKER(TASKID, INPUT, OUTPUT)
-  local f = io.open(INPUT)
-  -- retry because of NFS sync problems
-  while not f do f = io.open(INPUT) util.sleep(0.1) end
-  local task = assert( util.deserialize(f) )
-  f:close() os.remove(INPUT)
+local xe = require "xemsg"
+local xe_utils    = require "parxe.xemsg_utils"
+local deserialize = xe_utils.deserialize
+local serialize   = xe_utils.serialize
+--
+local TASKID = assert( tonumber( os.getenv("PARXE_TASKID") ) )
+local SERVER = assert( os.getenv("PARXE_SERVER") )
+local SERVER_PORT = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
+local CLIENT_PORT = assert( tonumber( os.getenv("PARXE_CLIENT_PORT") ) )
+local HASH = assert( os.getenv("PARXE_HASH") )
+local HOSTNAME
+do
+  local f = io.popen("hostname")
+  HOSTNAME = f:read("*l") f:close()
+end
+local function RUN_WORKER(TASKID, SERVER, HOSTNAME,
+                          SERVER_PORT, CLIENT_PORT, HASH)
+  local client_string,binded
+  local s_client = assert( xe.socket(xe.AF_SP, xe.NN_PULL) )
+  local binded = assert( xe.bind(s_client, "tcp://*:"..CLIENT_PORT) )
+  local client_string = "tcp://%s:%d"%{HOSTNAME, CLIENT_PORT}
+  --
+  local server_string = "tcp://%s:%d"%{SERVER, SERVER_PORT}
+  local s_server = assert( xe.socket(xe.AF_SP, xe.NN_PUSH) )
+  assert( xe.connect(s_server, server_string) )
+  serialize({ id=TASKID, client=client_string, hash=HASH, request=true }, s_server)
+  local task
+  repeat task = deserialize( s_client ) until task.id
+  assert( xe.shutdown(s_client, binded) )
   local func, args, id = task.func, task.args, task.id
-  assert(TASKID == id)
+  -- print(TASKID, id)
+  -- assert(TASKID == id)
   local ok,result = xpcall(func,debug.traceback,table.unpack(args))
   local err = nil
   if not ok then err,result=result,{} end
-  util.serialize({id=id, result=result, err=err}, OUTPUT)
+  serialize({ id=id, result=result, err=err,
+              hash=HASH, client=client_string, reply=true }, s_server)
 end
-RUN_WORKER(TASKID, INPUT, OUTPUT)
+RUN_WORKER(TASKID, SERVER, HOSTNAME, SERVER_PORT, CLIENT_PORT, HASH)
