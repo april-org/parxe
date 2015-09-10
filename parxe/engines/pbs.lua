@@ -44,7 +44,7 @@ local check_worker,server
 local poll_fds={}
 local pending_futures = {}
 local allowed_resources = { mem=true, q=true, name=true, omp=true,
-                            appname=true, port=true, host=true,
+                            appname=true, host=true,
                             properties = true }
 local resources = { appname="april-ann", host=HOSTNAME, port=1234 }
 local shell_lines = {}
@@ -53,14 +53,11 @@ local shell_lines = {}
 
 local next_port,release_port
 do
-  local last_port = resources.port
+  local last_port = resources.port + 1
   local client_ports = {}
   function next_port()
     local p = table.remove(client_ports) or last_port
     if p == last_port then last_port = last_port + 1 end
-    if p == resources.port then
-      return next_port()
-    end
     return p
   end
   function release_port(p)
