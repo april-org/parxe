@@ -53,11 +53,14 @@ local shell_lines = {}
 
 local next_port,release_port
 do
-  local last_port = 1234
+  local last_port = resources.port
   local client_ports = {}
   function next_port()
     local p = table.remove(client_ports) or last_port
     if p == last_port then last_port = last_port + 1 end
+    if p == resources.port then
+      return next_port()
+    end
     return p
   end
   function release_port(p)
