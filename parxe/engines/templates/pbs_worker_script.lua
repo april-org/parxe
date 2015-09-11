@@ -21,28 +21,27 @@ local xe_utils    = require "parxe.xemsg_utils"
 local deserialize = xe_utils.deserialize
 local serialize   = xe_utils.serialize
 --
-local SERVER = assert( os.getenv("PARXE_SERVER") )
-local PORT = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
-local HASH = assert( os.getenv("PARXE_HASH") )
-local JOBID = assert( os.getenv("PBS_JOBID") )
-local HOSTNAME
+local HASH     = assert( os.getenv("PARXE_HASH") )
+local HOSTNAME = common.hostname()
+local JOBID    = assert( os.getenv("PBS_JOBID") )
+local PORT     = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
+local SERVER   = assert( os.getenv("PARXE_SERVER") )
 print("# JOBID: ", JOBID)
-do
-  local f = io.popen("hostname")
-  HOSTNAME = f:read("*l") f:close()
-end
-local function RUN_WORKER(SERVER, HOSTNAME, PORT, HASH, JOBID)
-  local client = assert( xe.socket(xe.AF_SP, xe.NN_REQ) )
-  assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
-  serialize({ jobid=JOBID, hash=HASH, request=true }, client)
-  local task = deserialize(client)
-  local func, args, id = task.func, task.args, task.id
-  print("# TASKID: ", task.id)
-  local ok,result = xpcall(func,debug.traceback,table.unpack(args))
-  local err = nil
-  if not ok then err,result=result,{} end
-  serialize({ jobid=JOBID, id=id, result=result,
-              err=err, hash=HASH, reply=true }, client)
-  assert( deserialize(client) )
-end
-RUN_WORKER(SERVER, HOSTNAME, PORT, HASH, JOBID)
+-- socket creation and connection
+local client = assert( xe.socket(xe.AF_SP, xe.NN_REQ) )
+assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
+-- request a new job
+serialize({ jobid=JOBID, hash=HASH, request=true }, client)
+-- response with task data
+local task = deserialize(client)
+local func, args, id = task.func, task.args, task.id
+print("# TASKID: ", task.id)
+-- execute the task
+local ok,result = xpcall(func,debug.traceback,table.unpack(args))
+local err = nil
+if not ok then err,result=result,{} end
+-- request returning the task result
+serialize({ jobid=JOBID, id=id, result=result,
+            err=err, hash=HASH, reply=true }, client)
+assert( deserialize(client) ) -- ASK
+

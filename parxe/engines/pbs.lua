@@ -25,13 +25,9 @@ local serialize   = xe_utils.serialize
 local deserialize = xe_utils.deserialize
 
 ---------------------------------------------------------------------------
-local TMPNAME = os.tmpname()
-local HASH = TMPNAME:match("^.*lua_(.*)$")
-local HOSTNAME
-do
-  local f = io.popen("hostname")
-  HOSTNAME = f:read("*l") f:close()
-end
+local TMPNAME  = os.tmpname()
+local HASH     = TMPNAME:match("^.*lua_(.*)$")
+local HOSTNAME = common.hostname()
 ---------------------------------------------------------------------------
 
 local pbs,pbs_methods = class("parxe.engine.pbs")
@@ -40,7 +36,7 @@ local singleton
 ---------------------------------------------------------------------------
 
 local check_worker,server
-local poll_fds={}
+local poll_fds = {}
 -- A table with all the futures related with executed processes. The table is
 -- indexed as a dictionary using PBS jobids as keys.
 local pending_futures = {}
@@ -53,7 +49,7 @@ local shell_lines = {}
 ---------------------------------------------------------------------------
 
 -- initializes the nanomsg SP socket for REQ/REP pattern
-local function init(singleton)
+local function init()
   server = assert( xe.socket(xe.AF_SP, xe.NN_REP) )
   assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
   poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
@@ -138,7 +134,7 @@ function pbs_methods:get_max_tasks() return math.huge end
 function pbs_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
   resources[key] = value
-  if key == "port" then init(singleton) end
+  if key == "port" then init() end
 end
 
 function pbs_methods:append_shell_line(value)
@@ -173,10 +169,10 @@ local function process_message(pending_futures, s, revents)
     assert(cmd.hash == HASH,
            "Warning: unknown hash identifier, check that every server has a different port\n")
     if cmd.request then
-      -- task request
+      -- task request, send a reply with the task
       send_task(pending_futures[cmd.jobid])
     elseif cmd.reply then
-      -- task reply
+      -- task reply, read task result and send ack
       process_reply(pending_futures, cmd)
       if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
       return true
@@ -208,5 +204,5 @@ end
 singleton = pbs()
 class.extend_metamethod(pbs, "__call", function() return singleton end)
 common.user_conf("pbs.lua", singleton)
-init(singleton)
+init()
 return singleton

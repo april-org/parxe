@@ -78,6 +78,14 @@ local function gettime()
   return s + us/1.0e6
 end
 
+-- returns hostname using the same OS command
+local function hostname()
+  local f = assert(io.popen("hostname"), "hostname command not found")
+  local HOSTNAME = f:read("*l")
+  f:close()
+  return HOSTNAME
+end
+
 -- function which returns the next task id number
 local next_task_id
 do
@@ -138,6 +146,7 @@ return {
   compute_task_split = compute_task_split,
   deserialize = deserialize,
   gettime = gettime,
+  hostname = hostname,
   make_serializer = make_serializer,
   next_task_id = next_task_id,
   range_object = range_object,
