@@ -31,11 +31,12 @@ local config = require "parxe.config"
 --   _stderr_ will contain a filename where stderr can be retrieved from
 local future,future_methods = class("parxe.future")
 
--- useful functions
+-- useful functions and variables
 local gettime = common.gettime
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 local function aborted_function() error("aborted future execution") end
 local function dummy_function() end
+local TIMEOUT = 120 -- seconds
 
 -------------------------------------------------------------------------
 
@@ -54,9 +55,18 @@ function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
 end
 
+local TIMEDOUT = false
+local function wait_exists(filename)
+  local t0 = gettime()
+  while not io.open(filename) and not TIMEDOUT do
+    util.wait(config.wait_step())
+    if elapsed_time(t0) > TIMEOUT then TIMEDOUT=true break end
+  end
+end
+
 function future:destructor()
-  if self._stdout_ then os.remove(self._stdout_) end
-  if self._stderr_ then os.remove(self._stderr_) end
+  if self._stdout_ then wait_exists(self._stdout_) os.remove(self._stdout_) end
+  if self._stderr_ then wait_exists(self._stderr_) os.remove(self._stderr_) end
 end
 
 -- waits until timeout (or infinity if not given) and returns true in case data
