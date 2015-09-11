@@ -15,6 +15,16 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- This module implements reduce operation. Two different reduce operations are
+-- available. The standard reduce receives an object, a function, and splits the
+-- object into several pieces which are reduced independently and in a parallel
+-- way. This standard reduce returns a table with the reduction output for every
+-- slice of the input object. The second one reduce operation is called
+-- reduce.self_distributive, and is devoted for reduce functions which are
+-- distributive, commutative and idempotent. In this case, the reduce operation
+-- instead of returning a table of values, it returns a unique reduced value.
+
 local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"

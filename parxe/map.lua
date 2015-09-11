@@ -15,6 +15,15 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- This module implements map function. Two different maps are possible:
+-- standard map, which traverses the given object using # and [] operator and
+-- executes map function over length one slices; and bunch map which allow to
+-- execute a map function over a whole slice of the input object, normally with
+-- length > 1. The bunch map operation is useful to work with matrices, because
+-- you can implement a map function over a whole matrix, not only a row, and it
+-- can be computationally more efficient.
+
 local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"

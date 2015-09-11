@@ -15,6 +15,11 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- The pipe class is a wrapper around two C POSIX pipes (binded in APRIL-ANN)
+-- and has a simple interface which allow to configure the pipe for a
+-- child/parent pair, allowing to communicate both ends using the pipe.
+
 local pipe,pipe_methods = class("parxe.pipe")
 
 function pipe:constructor()

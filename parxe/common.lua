@@ -15,6 +15,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- range_object class, it is constructed giving two numbers (a range [a,b]) and
+-- the object implements metamethods to be iterable using # and [] operators,
+-- and ipairs function
 local range_object,range_object_methods = class("parxe.range_object")
 function range_object:constructor(a,b) self.a = a self.b = b self.n = b-a+1 end
 function range_object_methods:ctor_name() return 'class.find("parxe.range_object")' end
@@ -33,6 +37,12 @@ class.extend_metamethod(range_object, "__ipairs",
 
 -----------------------------------------------------------------------------
 
+-- Given an object (which allow operators # and []), and a parallel engine, this
+-- function computes and returns the length N of the object, the number M of
+-- parallel tasks to be executed and the length K of every object slice for every
+-- parallel task. The length K is the ceiling of the proportion N/M, so the
+-- caller needs to compute properly the length of the last task which can be
+-- less than K.
 local function compute_task_split(object, engine)
   local config = require "parxe.config"
   local max_number_tasks = config.max_number_tasks()
@@ -43,6 +53,7 @@ local function compute_task_split(object, engine)
   return N,M,K
 end
 
+-- deserializes an object send by means of a stream file
 local function deserialize(f)
   local config = require "parxe.config"
   local line = f:read("*l") if not line then return end
@@ -60,16 +71,21 @@ local function deserialize(f)
   }
 end
 
+-- returns a double number representing the current timestamp with a resolution
+-- up to microseconds
 local function gettime()
   local s,us = util.gettimeofday()
   return s + us/1.0e6
 end
 
-local task_id,next_task_id
+-- function which returns the next task id number
+local next_task_id
 do
-  task_id = 0 function next_task_id() task_id = task_id + 1 return task_id end
+  local task_id = 0 function next_task_id() task_id = task_id + 1 return task_id end
 end
 
+-- returns a coroutine which serializes a given object through the given stream
+-- file, the coroutine returns true when serialization has been performed
 local function make_serializer(obj, f)
   return coroutine.wrap(
     function()
@@ -89,6 +105,8 @@ local function make_serializer(obj, f)
   )
 end
 
+-- Given an iterable object, it returns its slice range [a,b]. If object is
+-- a number, it returns a range_object(a,b)
 local function take_slice(obj, a, b)
   if type(obj) == "number" then return range_object(a,b) end
   if a == 1 and b == #obj then return obj end
@@ -101,6 +119,7 @@ local function take_slice(obj, a, b)
   return object_slice
 end
 
+-- loads configuration from system files
 local function user_conf(filename, ...)
   local f,CONF
   local HOME = os.getenv("HOME")

@@ -15,6 +15,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- This module reimplements functions serialize and deserialize to work with
+-- nanomsg SP sockets, replacing implementation done at common module.
+
 local config = require "parxe.config"
 local xe     = require "xemsg"
 

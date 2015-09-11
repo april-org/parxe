@@ -18,17 +18,21 @@
 
 local common = require "parxe.common"
 
--- config variables, they are private
-local block_size = 2^20
-local engine
-local exports = "/tmp/exports"
-local max_number_tasks = 64
-local min_task_len = 32
-local tmp = "/tmp"
-local wait_step = 0.1
-local working_directory
+-- config variables, they are private to this module, and can be changed through
+-- the exported functions
+
+local block_size = 2^20 -- piece size used for serialization over stream files
+local engine            -- the parallel engine configured and selected by the
+                        -- user
+local max_number_tasks = 64 -- maximum number of tasks to perform a computation
+                            -- (map/reduce over an object)
+local min_task_len = 32 -- minimum length of any task
+local tmp = "/tmp"      -- temporary directory, used by engines which need to
+                        -- read/write into filesystem
+local wait_step = 0.1   -- timeout in seconds used to avoid blocking calls
+local working_directory -- current working directory
 --
-local update_wd
+local update_wd -- a function which assigns pwd output as working_directory
 do
   update_wd = function()
     local aux = io.popen("pwd")
@@ -44,7 +48,6 @@ api = {
   init = function() common.user_conf("config.lua", api) engine = engine or require "parxe.engines.seq" return api end,
   block_size = function() return block_size end,
   engine = function() return engine end,
-  exports = function() assert(os.execute("mkdir -p "..exports)) return exports end,
   max_number_tasks = function() return max_number_tasks end,
   min_task_len = function() return min_task_len end,
   tmp = function() return tmp end,
@@ -53,13 +56,14 @@ api = {
   --
   set_block_size = function(n) assert(type(n) == "number") block_size = n end,
   set_engine = function(str) assert(type(str) == "string") engine = require ("parxe.engines."..str) end,
-  set_exports = function(str) assert(type(str) == "string") exports = str end,
   set_max_number_tasks = function(n) assert(type(n) == "number") max_number_tasks = n end,
   set_min_task_len = function(n) assert(type(n) == "number") min_task_len = n end,
   set_tmp = function(str) assert(type(str) == "string") tmp = str end,
   set_wait_step = function(n) assert(type(n) == "number") wait_step = n end,
   set_wd = function(str) assert(type(str) == "string") os.execute("cd "..str) update_wd() end,
-  --
+  -- This update function receives a dictionary of keys where every key is a
+  -- private variable of this module. This way it is possible to update several
+  -- variables at the same time.
   update = function(dict)
     for key,value in dict do
       local f = april_assert(api["set_"..key], "Unknown key %s", key)

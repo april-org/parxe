@@ -15,6 +15,10 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
+
+-- Lock class is intended to perform a disk file lock approach, allowing to
+-- create the lock and to remove it. Lock filename is generated randomly
+-- using Lua os.tmpname() in order to avoid collisions.
 local lock,lock_methods = class("parxe.lock")
 
 local io_open    = io.open

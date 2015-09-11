@@ -17,18 +17,30 @@
 ]]
 local common = require "parxe.common"
 local config = require "parxe.config"
+
+-- Future objects are the result of executing parllel functions. They doesn't
+-- contain any value, but the application can be stopped waiting the value in
+-- case it is necessary. This objects wrap some data needed to check when the
+-- result is available. A function is given during construction to allow future
+-- object adaptation to different parallel engines.
+--
+-- Future objects has some special fields which are responsability of the caller:
+--   _result_ will contain the computation output when reday
+--   _err_    will contain a string with errors captured at workers
+--   _stdout_ will contain a filename where stdout can be retrieved from
+--   _stderr_ will contain a filename where stderr can be retrieved from
 local future,future_methods = class("parxe.future")
 
+-- useful functions
 local gettime = common.gettime
-
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
-
 local function aborted_function() error("aborted future execution") end
-
 local function dummy_function() end
 
 -------------------------------------------------------------------------
 
+-- print of any future object indicates it is a future object and its data is
+-- ready or not
 class.extend_metamethod(future, "__tostring", function(self)
                           if self._result_ then
                             return "future: ready"
@@ -36,6 +48,8 @@ class.extend_metamethod(future, "__tostring", function(self)
                           return "future: not ready, use wait or any get method"
 end)
 
+-- do_work is a function responsible for checking when data is available, and
+-- responsible of setting the computation result at field _result_
 function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
 end
@@ -45,6 +59,8 @@ function future:destructor()
   if self._stderr_ then os.remove(self._stderr_) end
 end
 
+-- waits until timeout (or infinity if not given) and returns true in case data
+-- is available
 function future_methods:wait(timeout, sleep_step)
   timeout = timeout or math.huge
   sleep_step = sleep_step or config.wait_step()
@@ -53,13 +69,16 @@ function future_methods:wait(timeout, sleep_step)
   while not self:ready() and elapsed_time(t0_sec) < timeout do
     util_sleep(sleep_step)
   end
+  return self:ready()
 end
 
+-- waits until data is available and returns it
 function future_methods:get()
   if not self._result_ then self:wait() end
   return self._result_
 end
 
+-- read stderr file or _err_ field
 function future_methods:get_stderr()
   if not self._result_ then self:wait() end
   local err
@@ -71,11 +90,13 @@ function future_methods:get_stderr()
     err = f:read("*a")
     f:close()
   end
-  if err and #err > 0 then return err end
+  return err or ""
 end
 
+-- return stderr file
 function future_methods:get_stdout()
   if not self._result_ then self:wait() end
+  if not self._stdout_ then return "" end
   local f
   repeat f = io.open(self._stdout_) util.sleep(config.wait_step()) until f
   local out = f:read("*a")
@@ -83,11 +104,13 @@ function future_methods:get_stdout()
   return out
 end
 
+-- does some work and indicates if the result is ready or not
 function future_methods:ready()
   self:_do_work_()
   return self._result_ ~= nil
 end
 
+-- currently this is not implemented :(
 function future_methods:abort()
   assert(self._abort_, "Abort function not available for this future object")
   self._aborted_ = true
@@ -96,18 +119,25 @@ end
 
 -------------------------------------------------------------------------
 
+-- this section declares a future.all function which returns a future object
+-- configured to wait a table of future objects
+
+-- concatenates all stdout outputs
 local all_get_stdout = function(self)
   local tbl = {}
   for i,f in ipairs(self.data) do tbl[i] = f:get_stdout() end
   return table.concat(tbl,"\n")
 end
 
+-- concatenates all stderr outputs
 local all_get_stderr = function(self)
   local tbl = {}
   for i,f in ipairs(self.data) do tbl[i] = f:get_stderr() end
   return table.concat(tbl,"\n")
 end
 
+-- executes ready() function over all futures, in case all are ready, it inserts
+-- all the results into a table and assigns _result_ field
 local all_do_work = function(self)
   local all_ready = true
   for i,f in ipairs(self.data) do
@@ -132,6 +162,8 @@ local all_do_work = function(self)
   self._result_ = result
 end
 
+-- creates a future with all_do_work function and configures its get_stdout and
+-- get_stderr methods, stores the given table of futures at the data field
 function future.all(tbl)
   local f = future(all_do_work)
   f.get_stdout = all_get_stdout
@@ -142,6 +174,11 @@ end
 
 -------------------------------------------------------------------------
 
+-- this section declares future.conditioned function, which allow to create
+-- future objects which delay the execution of a function over the result
+-- of another future object
+
+-- checks the viability of data in the future object at data field
 local conditioned_do_work = function(self)
   if self.data:ready() then
     local data = self.func( self.data:get(), table.unpack(self.args) )
@@ -151,6 +188,8 @@ local conditioned_do_work = function(self)
   end
 end
 
+-- configures a future object which runs conditioned_do_work function and
+-- contains another future object
 function future.conditioned(func, other, ...)
   assert(class.is_a(other, future), "Needs a future as second argument")
   local f = future(conditioned_do_work)
