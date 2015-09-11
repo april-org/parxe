@@ -21,37 +21,28 @@ local xe_utils    = require "parxe.xemsg_utils"
 local deserialize = xe_utils.deserialize
 local serialize   = xe_utils.serialize
 --
-local TASKID = assert( tonumber( os.getenv("PARXE_TASKID") ) )
 local SERVER = assert( os.getenv("PARXE_SERVER") )
-local SERVER_PORT = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
-local CLIENT_PORT = assert( tonumber( os.getenv("PARXE_CLIENT_PORT") ) )
+local PORT = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
 local HASH = assert( os.getenv("PARXE_HASH") )
+local JOBID = assert( os.getenv("PBS_JOBID") )
 local HOSTNAME
+print("# JOBID: ", JOBID)
 do
   local f = io.popen("hostname")
   HOSTNAME = f:read("*l") f:close()
 end
-local function RUN_WORKER(TASKID, SERVER, HOSTNAME,
-                          SERVER_PORT, CLIENT_PORT, HASH)
-  local client_string,binded
-  local s_client = assert( xe.socket(xe.AF_SP, xe.NN_PULL) )
-  local binded = assert( xe.bind(s_client, "tcp://*:"..CLIENT_PORT) )
-  local client_string = "tcp://%s:%d"%{HOSTNAME, CLIENT_PORT}
-  --
-  local server_string = "tcp://%s:%d"%{SERVER, SERVER_PORT}
-  local s_server = assert( xe.socket(xe.AF_SP, xe.NN_PUSH) )
-  assert( xe.connect(s_server, server_string) )
-  serialize({ id=TASKID, client=client_string, hash=HASH, request=true }, s_server)
-  local task
-  repeat task = deserialize( s_client ) until task.id
-  assert( xe.shutdown(s_client, binded) )
+local function RUN_WORKER(SERVER, HOSTNAME, PORT, HASH, JOBID)
+  local client = assert( xe.socket(xe.AF_SP, xe.NN_REQ) )
+  assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
+  serialize({ jobid=JOBID, hash=HASH, request=true }, client)
+  local task = deserialize(client)
   local func, args, id = task.func, task.args, task.id
-  -- print(TASKID, id)
-  -- assert(TASKID == id)
+  print("# TASKID: ", task.id)
   local ok,result = xpcall(func,debug.traceback,table.unpack(args))
   local err = nil
   if not ok then err,result=result,{} end
-  serialize({ id=id, result=result, err=err,
-              hash=HASH, client=client_string, reply=true }, s_server)
+  serialize({ jobid=JOBID, id=id, result=result,
+              err=err, hash=HASH, reply=true }, client)
+  assert( deserialize(client) )
 end
-RUN_WORKER(TASKID, SERVER, HOSTNAME, SERVER_PORT, CLIENT_PORT, HASH)
+RUN_WORKER(SERVER, HOSTNAME, PORT, HASH, JOBID)

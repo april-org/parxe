@@ -31,9 +31,7 @@ local function dummy_function() end
 
 class.extend_metamethod(future, "__tostring", function(self)
                           if self._result_ then
-                            local err = self:get_stderr()
-                            if err then return "future: ready with some warnings or errors" end
-                            return "future: ready without errors or warnings"
+                            return "future: ready"
                           end
                           return "future: not ready, use wait or any get method"
 end)
@@ -68,7 +66,8 @@ function future_methods:get_stderr()
   if not self._stderr_ then
     err = self._err_
   else
-    local f = io.open(self._stderr_)
+    local f
+    repeat f = io.open(self._stderr_) util.sleep(config.wait_step()) until f
     err = f:read("*a")
     f:close()
   end
@@ -77,7 +76,8 @@ end
 
 function future_methods:get_stdout()
   if not self._result_ then self:wait() end
-  local f = io.open(self._stdout_)
+  local f
+  repeat f = io.open(self._stdout_) util.sleep(config.wait_step()) until f
   local out = f:read("*a")
   f:close()
   return out
@@ -99,13 +99,13 @@ end
 local all_get_stdout = function(self)
   local tbl = {}
   for i,f in ipairs(self.data) do tbl[i] = f:get_stdout() end
-  return tbl
+  return table.concat(tbl,"\n")
 end
 
 local all_get_stderr = function(self)
   local tbl = {}
   for i,f in ipairs(self.data) do tbl[i] = f:get_stderr() end
-  return tbl
+  return table.concat(tbl,"\n")
 end
 
 local all_do_work = function(self)
