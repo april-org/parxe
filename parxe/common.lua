@@ -113,6 +113,15 @@ local function make_serializer(obj, f)
   )
 end
 
+local function parallel_engine_wait_method(pending_futures)
+  repeat
+    for id,f in pairs(pending_futures) do
+      f:wait()
+      pending_futures[id] = nil
+    end
+  until not next(pending_futures)
+end
+
 -- Given an iterable object, it returns its slice range [a,b]. If object is
 -- a number, it returns a range_object(a,b)
 local function take_slice(obj, a, b)
@@ -149,6 +158,7 @@ return {
   hostname = hostname,
   make_serializer = make_serializer,
   next_task_id = next_task_id,
+  parallel_engine_wait_method = parallel_engine_wait_method,
   range_object = range_object,
   take_slice = take_slice,
   user_conf = user_conf,

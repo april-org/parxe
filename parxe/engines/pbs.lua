@@ -21,6 +21,7 @@ local future   = require "parxe.future"
 local xe       = require "xemsg"
 local xe_utils = require "parxe.xemsg_utils"
 
+local parallel_engine_wait_method = common.parallel_engine_wait_method
 local serialize   = xe_utils.serialize
 local deserialize = xe_utils.deserialize
 
@@ -35,15 +36,24 @@ local singleton
 
 ---------------------------------------------------------------------------
 
+-- Forward declaration of check_worker function (see future module) and server
+-- socket.
 local check_worker,server
+
+-- Used in xe.poll() function.
 local poll_fds = {}
+
 -- A table with all the futures related with executed processes. The table is
 -- indexed as a dictionary using PBS jobids as keys.
 local pending_futures = {}
+
+-- Table with all allowed resources for PBS configuration. They can be setup
+-- by means of set_resource method in pbs engine object.
 local allowed_resources = { mem=true, q=true, name=true, omp=true,
-                            appname=true, host=true,
-                            properties = true }
+                            appname=true, host=true, properties = true }
+-- Value of resources for PBS configuration.
 local resources = { appname="april-ann", host=HOSTNAME, port=1234 }
+-- Lines of shell script to be executed by PBS script before running worker
 local shell_lines = {}
 
 ---------------------------------------------------------------------------
@@ -120,28 +130,25 @@ function pbs_methods:execute(func, ...)
   return f
 end
 
+-- waits until all futures are ready
 function pbs_methods:wait()
-  repeat
-    for jobid,f in pairs(pending_futures) do
-      f:wait()
-      pending_futures[jobid] = nil
-    end
-  until not next(pending_futures)
+  parallel_engine_wait_method(pending_futures)
 end
 
+-- no limit due to PBS
 function pbs_methods:get_max_tasks() return math.huge end
 
+-- configure PBS resources for qsub script configuration
 function pbs_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
   resources[key] = value
   if key == "port" then init() end
 end
 
+-- appends a new shell line which will be executed by qsub script
 function pbs_methods:append_shell_line(value)
   table.insert(shell_lines, value)
 end
-
-function pbs_methods:get_hash() return HASH end
 
 ----------------------------- check worker helpers ---------------------------
 

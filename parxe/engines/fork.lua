@@ -21,6 +21,8 @@ local future = require "parxe.future"
 local lock   = require "parxe.lock"
 local pipe   = require "parxe.pipe"
 
+local parallel_engine_wait_method = common.parallel_engine_wait_method
+
 ---------------------------------------------------------------------------
 
 local fork,fork_methods = class("parxe.engine.fork")
@@ -172,12 +174,7 @@ function fork_methods:execute(func, ...)
 end
 
 function fork_methods:wait()
-  repeat
-    for task_id,f in pairs(pending_futures) do
-      f:wait()
-      pending_futures[task_id] = nil
-    end
-  until not next(pending_futures)
+  parallel_engine_wait_method(pending_futures)
 end
 
 function fork_methods:get_max_tasks() return num_cores end

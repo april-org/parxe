@@ -15,8 +15,9 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
-local px = require "parxe"
-local xe = require "xemsg"
+local px          = require "parxe"
+local common      = require "parxe.common"
+local xe          = require "xemsg"
 local xe_utils    = require "parxe.xemsg_utils"
 local deserialize = xe_utils.deserialize
 local serialize   = xe_utils.serialize
@@ -44,4 +45,3 @@ if not ok then err,result=result,{} end
 serialize({ jobid=JOBID, id=id, result=result,
             err=err, hash=HASH, reply=true }, client)
 assert( deserialize(client) ) -- ASK
-
