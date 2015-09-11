@@ -36,7 +36,8 @@ local gettime = common.gettime
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 local function aborted_function() error("aborted future execution") end
 local function dummy_function() end
-local TIMEOUT = 120 -- seconds
+local NFS_TIMEOUT   = 20 -- seconds
+local NFS_WAIT_STEP =  2 -- seconds
 
 -------------------------------------------------------------------------
 
@@ -55,12 +56,14 @@ function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
 end
 
+-- implement wait until filename is synchronized by NFS or similar shared
+-- filesystems
 local TIMEDOUT = false
 local function wait_exists(filename)
   local t0 = gettime()
   while not io.open(filename) and not TIMEDOUT do
-    util.wait(config.wait_step())
-    if elapsed_time(t0) > TIMEOUT then TIMEDOUT=true break end
+    util.wait(NFS_WAIT_STEP)
+    if elapsed_time(t0) > NFS_TIMEOUT then TIMEDOUT=true break end
   end
 end
 
