@@ -59,6 +59,6 @@ print(f2:get())
 
 local f1 = px.run(function() return matrix(1024):linspace():sum() end)
 local f2 = px.run(function() return matrix(2048):linspace():sum() end)
-px.config.engine().wait()
+px.config.engine():wait()
 print(f1:get())
 print(f2:get())

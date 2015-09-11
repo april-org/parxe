@@ -69,7 +69,7 @@ function and a variable list of arguments received by the function.
 ```
 
 You can use `px.future.all()` which receives an array of futures to wait several
-futures at the same time. Similarly, you can use `px.config.engine().wait()`.
+futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 
 ```Lua
 > px = require "parxe"
