@@ -48,3 +48,17 @@ print(r)
 local f = px.reduce.self_distributive(function(a,x) return a+x end, iterator.range(1024):table(), 0)
 local r = f:get()
 print(r)
+
+local f1 = px.run(function() return matrix(1024):linspace():sum() end)
+local f2 = px.run(function() return matrix(2048):linspace():sum() end)
+local f  = px.future.all{f1,f2}
+f:wait()
+pprint(f:get())
+print(f1:get())
+print(f2:get())
+
+local f1 = px.run(function() return matrix(1024):linspace():sum() end)
+local f2 = px.run(function() return matrix(2048):linspace():sum() end)
+px.config.engine().wait()
+print(f1:get())
+print(f2:get())

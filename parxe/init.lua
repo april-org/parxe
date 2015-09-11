@@ -19,10 +19,13 @@ require "aprilann"
 local parxe = {
   _NAME     = "parxe",
   _VERSION  = "0.1",
+  -- utilities
   config    = require "parxe.config".init(),
-  --
+  future    = require "parxe.future",
+  -- parallel functions
   map       = require "parxe.map",
   reduce    = require "parxe.reduce",
+  run       = require "parxe.run",
 }
 
 return parxe

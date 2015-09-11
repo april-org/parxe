@@ -52,6 +52,36 @@ Other reducers can be more complicated:
 528 1552 2576 3600 4624 5648 6672 7696
 ```
 
+Besides map and reduce, you can run any function into the parallel environment.
+This can be done by means of `px.run()` function, whose arguments are a
+function and a variable list of arguments received by the function.
+
+```Lua
+> px = require "parxe"
+> f1 = px.run(function() return matrix(1024):linspace():sum() end)
+> f2 = px.run(function() return matrix(2048):linspace():sum() end)
+> f  = px.future.all{f1,f2}
+> f:wait()
+> print(f1:get())
+524800
+> print(f2:get())
+2098176
+```
+
+You can use `px.future.all()` which receives an array of futures to wait several
+futures at the same time. Similarly, you can use `px.config.engine().wait()`.
+
+```Lua
+> px = require "parxe"
+> f1 = px.run(function() return matrix(1024):linspace():sum() end)
+> f2 = px.run(function() return matrix(2048):linspace():sum() end)
+> px.config.engine().wait()
+> print(f1:get())
+524800
+> print(f2:get())
+2098176
+```
+
 ## Dependencies
 
 The "pbs" engine needs the installation of
