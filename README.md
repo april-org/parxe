@@ -85,7 +85,7 @@ futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 Future objects allow math operations, and the output of the operation is another
 future. Be careful, you only can operate with two futures, it is not possible to
 operate using a future and a non future object. In case you need this behavior,
-you can use the wrapper `future.value`:
+you can use the wrapper `px.future.value`:
 
 ```Lua
 > px = require "parxe"
@@ -96,6 +96,21 @@ you can use the wrapper `future.value`:
 > px.config.engine():wait()
 > print(f3:get())
 2622996
+```
+
+Even more, it is possible to condition the execution of a function to the
+evaluation of a future object, using `px.future.conditioned` as in:
+
+```Lua
+> px = require "parxe"
+> fv = px.future.value
+> fc = px.future.conditioned
+> f1 = px.run(function() return matrix(1024):linspace():sum() end)
+> f2 = px.run(function() return matrix(2048):linspace():sum() end)
+> f3 = fc(function(x) return x/2 end, f1 + f2 + fv(20))
+> px.config.engine():wait()
+> print(f3:get())
+1311498
 ```
 
 ## Engines

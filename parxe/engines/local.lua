@@ -84,8 +84,6 @@ function local_engine_methods:execute(func, ...)
   f.task     = { id=f.task_id, func=func, args=args, wd=config.wd() }
   pending_futures[f.task_id] = f
   table.insert(pending_tasks, f.task)
-  -- check any pending communication with workers
-  check_worker()
   return f
 end
 

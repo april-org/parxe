@@ -29,7 +29,7 @@ local PORT     = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
 local SERVER   = assert( os.getenv("PARXE_SERVER") )
 print("# JOBID: ", JOBID)
 -- socket creation and connection
-local client = assert( xe.socket(xe.AF_SP, xe.NN_REQ) )
+local client = assert( xe.socket(xe.NN_REQ) )
 assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
 -- request a new job
 serialize({ jobid=JOBID, hash=HASH, request=true }, client)

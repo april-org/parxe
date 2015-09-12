@@ -137,8 +137,6 @@ function pbs_methods:execute(func, ...)
   pending_futures[f.jobid] = f
   local task = { id=task_id, func=func, args=args, wd=config.wd() }
   f.task = task
-  -- check any pending communication with workers
-  check_worker()
   return f
 end
 
