@@ -36,8 +36,8 @@ local gettime = common.gettime
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 local function aborted_function() error("aborted future execution") end
 local function dummy_function() end
-local NFS_TIMEOUT   = 10 -- seconds
-local NFS_WAIT_STEP =  2 -- seconds
+local NFS_TIMEOUT   = 30 -- seconds
+local NFS_WAIT_STEP =  5 -- seconds
 
 -------------------------------------------------------------------------
 
