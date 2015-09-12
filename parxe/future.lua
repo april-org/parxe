@@ -231,6 +231,7 @@ function future.all(tbl)
   f.get_stdout = all_get_stdout
   f.get_stderr = all_get_stderr
   f.data = tbl
+  f:ready()
   return f
 end
 
@@ -258,6 +259,7 @@ function future.conditioned(func, other, ...)
   f.func = func
   f.data = other
   f.args = table.pack(...)
+  f:ready()
   return f
 end
 
