@@ -32,8 +32,9 @@ function RUN_WORKER(URI)
   serialize({ pid=PID, request=true }, client)
   -- response with task data
   local task = deserialize(client)
-  local func, args, id = task.func, task.args, task.id
+  local func, args, id, wd = task.func, task.args, task.id, task.wd
   print("# TASKID: ", task.id)
+  os.execute("cd " .. wd)
   -- execute the task
   local ok,result = xpcall(func,debug.traceback,table.unpack(args))
   local err = nil
