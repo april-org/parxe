@@ -42,7 +42,7 @@ local singleton
 
 -- Forward declaration of check_worker function (see at the end of the file) and
 -- server socket.
-local check_worker,server
+local check_worker,server,endpoint
 
 -- Used in xe.poll() function.
 local poll_fds = {}
@@ -65,7 +65,7 @@ local shell_lines = {}
 -- initializes the nanomsg SP socket for REQ/REP pattern
 local function init()
   server = assert( xe.socket(xe.NN_REP) )
-  assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
+  endpoint = assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
   poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
 end
 
@@ -115,9 +115,10 @@ function pbs:constructor()
 end
 
 function pbs:destructor()
-  os.remove(TMPNAME)
+  xe.shutdown(server, endpoint)
   xe.close(server)
   xe.term()
+  os.remove(TMPNAME)
 end
 
 -- configures a future object to perform the given operation func(...), assigns

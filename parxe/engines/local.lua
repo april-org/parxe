@@ -59,7 +59,7 @@ local num_running_workers = 0 -- it should be less or equal to num_cores
 ---------------------------------------------------------------------------
 
 local server = assert( xe.socket(xe.NN_REP) )
-assert( xe.bind(server, URI) )
+local endpoint = assert( xe.bind(server, URI) )
 -- Used in xe.poll() function.
 local poll_fds = {
   { fd = server, events = xe.NN_POLLIN }
@@ -71,6 +71,7 @@ function local_engine:constructor()
 end
 
 function local_engine:destructor()
+  xe.shutdown(server, endpoint)
   xe.close(server)
   xe.term()
   util.wait()

@@ -30,7 +30,7 @@ local SERVER   = assert( os.getenv("PARXE_SERVER") )
 print("# JOBID: ", JOBID)
 -- socket creation and connection
 local client = assert( xe.socket(xe.NN_REQ) )
-assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
+local endpoint = assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
 -- request a new job
 serialize({ jobid=JOBID, hash=HASH, request=true }, client)
 -- response with task data
@@ -45,5 +45,6 @@ if not ok then err,result=result,{} end
 serialize({ jobid=JOBID, id=id, result=result,
             err=err, hash=HASH, reply=true }, client)
 assert( deserialize(client) ) -- ASK
+xe.shutdown(client, endpoint)
 xe.close(client)
 xe.term()

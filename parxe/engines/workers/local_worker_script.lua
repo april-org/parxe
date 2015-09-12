@@ -27,7 +27,7 @@ function RUN_WORKER(URI)
   print("# URI: ", URI)
   -- socket creation and connection
   local client = assert( xe.socket(xe.NN_REQ) )
-  assert( xe.connect(client, URI) )
+  local endpoint = assert( xe.connect(client, URI) )
   -- request a new job
   serialize({ pid=PID, request=true }, client)
   -- response with task data
@@ -42,6 +42,7 @@ function RUN_WORKER(URI)
   -- request returning the task result
   serialize({ pid=PID, id=id, result=result, err=err, reply=true }, client)
   assert( deserialize(client) ) -- ASK
+  xe.shutdown(client, endpoint)
   xe.close(client)
   xe.term()
 end
