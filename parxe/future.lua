@@ -130,6 +130,55 @@ function future_methods:abort()
   self._do_work_ = aborted_function
 end
 
+-- future metamethods, to allow perform operations with them
+
+class.extend_metamethod(future, "__add",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]+t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__sub",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]-t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__mul",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]*t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__div",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]/t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__mod",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]%t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__pow",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]^t[2]',
+                                                    future.all{a,b})
+end)
+
+class.extend_metamethod(future, "__unm",
+                        function(a)
+                          return future.conditioned(lambda'|a|-a', a)
+end)
+
+class.extend_metamethod(future, "__concat",
+                        function(a,b)
+                          return future.conditioned(lambda'|t|t[1]..t[2]',
+                                                    future.all{a,b})
+end)
+
 -------------------------------------------------------------------------
 
 -- this section declares a future.all function which returns a future object
@@ -209,6 +258,15 @@ function future.conditioned(func, other, ...)
   f.func = func
   f.data = other
   f.args = table.pack(...)
+  return f
+end
+
+-------------------------------------------------------------------------
+
+-- a wrapper over a Lua object value
+function future.value(v)
+  local f = future()
+  f._result_ = v
   return f
 end
 

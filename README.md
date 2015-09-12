@@ -82,6 +82,22 @@ futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 2098176
 ```
 
+Future objects allow math operations, and the output of the operation is another
+future. Be careful, you only can operate with two futures, it is not possible to
+operate using a future and a non future object. In case you need this behavior,
+you can use the wrapper `future.value`:
+
+```Lua
+> px = require "parxe"
+> fv = px.future.value
+> f1 = px.run(function() return matrix(1024):linspace():sum() end)
+> f2 = px.run(function() return matrix(2048):linspace():sum() end)
+> f3 = f1 + f2 + fv(20)
+> px.config.engine():wait()
+> print(f3:get())
+2622996
+```
+
 ## Engines
 
 PARXE can be extended by different parallel engines. They can be configured
