@@ -75,7 +75,7 @@ futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 > px = require "parxe"
 > f1 = px.run(function() return matrix(1024):linspace():sum() end)
 > f2 = px.run(function() return matrix(2048):linspace():sum() end)
-> px.config.engine().wait()
+> px.config.engine():wait()
 > print(f1:get())
 524800
 > print(f2:get())
