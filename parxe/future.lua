@@ -36,8 +36,8 @@ local gettime = common.gettime
 local function elapsed_time(t0_sec) return gettime() - t0_sec end
 local function aborted_function() error("aborted future execution") end
 local function dummy_function() end
-local NFS_TIMEOUT   = 30 -- seconds
-local NFS_WAIT_STEP =  5 -- seconds
+local NFS_TIMEOUT   = 60 -- seconds
+local NFS_WAIT_STEP =  1 -- seconds
 
 -------------------------------------------------------------------------
 
@@ -62,8 +62,16 @@ local TIMEDOUT = false
 local function wait_exists(filename)
   local t0 = gettime()
   while not io.open(filename) and not TIMEDOUT do
-    util.wait(NFS_WAIT_STEP)
-    if elapsed_time(t0) > NFS_TIMEOUT then TIMEDOUT=true break end
+    fprintf(io.stderr,
+            "# Waiting disk sync for tmp cleaning: %.0f s more, %.0f s elapsed \n",
+            NFS_WAIT_STEP, elapsed_time(t0))
+    util.sleep(NFS_WAIT_STEP)
+    if elapsed_time(t0) > NFS_TIMEOUT then
+      fprintf(io.stderr, "Wait timedout!\n")
+      TIMEDOUT=true
+      break
+    end
+    NFS_WAIT_STEP = NFS_WAIT_STEP + 1
   end
 end
 
