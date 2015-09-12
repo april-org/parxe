@@ -82,9 +82,84 @@ futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 2098176
 ```
 
+## Engines
+
+PARXE can be extended by different parallel engines. They can be configured
+using the function `px.config.set_engine(ENGINE)` given in `ENGINE` a Lua string
+with the name of the particular engine you want to use. Currently there are
+three engines available:
+
+- "seq" is not a parallel engine, it just executes every command as soon as they
+  are requested.
+
+- "local" it uses `nohup` to execute as many workers as cores has the local
+  machine. It uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg IPC
+  transport to communication between processes.
+
+- "pbs" it uses `qsub` to execute as many workers as needed in a PBS cluster. It
+  uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg TCP transport to
+  communication between processes.
+
+## Default configuration
+
+Some configuration parameters can be setup before the execution of any command
+by PARXE. This can be done writing into file `$HOME/.parxe/default/config.lua`
+something similar to:
+
+```Lua
+local config = ...
+-- Where your stdout and stderr will be written during PARXE execution. All
+-- written files will be cleaned-up before exiting.
+config.set_tmp("/home/public/tmp")
+-- The engine you want to use by default.
+config.set_engine("pbs")
+```
+
+Other things which can be configured are:
+
+- `config.set_engine(ENGINE)` receives the name of the engine.
+
+- `config.set_max_number_tasks(N)` sets a maximum number of concurrent tasks
+  you want to execute. By default it is set to 64.
+
+- `config.set_min_task_len(N)` map/reduce commands are split into slices with a
+  minimum length number, which can be configured with this function. By default
+  it is 32.
+
+- `config.set_tmp(PATH)` changes the temporary directory used by PARXE. For
+  cluster engines, like "pbs", it should be a shred folder between all your
+  machines.
+
+- `config.set_wait_step(SECONDS)` in order to not block the execution of Lua,
+  all operations are performed with a wait timeout. The default value is
+  0.1 seconds.
+
+- `config.set_wd(PATH)` changes the working directory where PARXE workers will
+  be executed. By default it is given by `pwd` OS  command.
+
+Additionally, some engines, like the "pbs" engine, use resources from your
+computer or cluster which can be configured beforehand. To do that, you can
+write into `$HOME/.parxe/default/pbs.lua` a file containing something like:
+
+```Lua
+local pbs = ...
+pbs:append_shell_line(". /etc/my-env-vars")
+pbs:set_resource("q", "short")    -- PBS queue name
+pbs:set_resource("name", "TEST")  -- Default name of qsub jobs
+pbs:set_resource("omp", 1)        -- Number of OMP threads
+pbs:set_resource("appname", "$APRIL_EXEC")
+```
+
+In "pbs" engine you can execute as many `append_shell_line()` as you need.
+All this lines will be enqueued and executed in order just before execution
+of the worker application. The PBS resources available to be configured are:
+`mem`, `q`, `name`, `omp`, `appname`, `host`, `properties`. All of them are
+numbers or just a string with the resource, except properties which is a table
+of strings.
+
 ## Dependencies
 
-The "pbs" engine needs the installation of
+The local and pbs engines needs the installation of
 [Xemsg!](https://github.com/pakozm/xemsg) a binding of
 [nanomsg](http://nanomsg.org/) for Lua. So, first you need to have installed
 libnanomsg-dev in your system and then execute:

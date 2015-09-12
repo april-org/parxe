@@ -21,7 +21,6 @@ local common = require "parxe.common"
 -- config variables, they are private to this module, and can be changed through
 -- the exported functions
 
-local block_size = 2^20 -- piece size used for serialization over stream files
 local engine            -- the parallel engine configured and selected by the
                         -- user
 local max_number_tasks = 64 -- maximum number of tasks to perform a computation
@@ -46,7 +45,6 @@ update_wd()
 local api
 api = {
   init = function() common.user_conf("config.lua", api) engine = engine or require "parxe.engines.seq" return api end,
-  block_size = function() return block_size end,
   engine = function() return engine end,
   max_number_tasks = function() return max_number_tasks end,
   min_task_len = function() return min_task_len end,
@@ -54,7 +52,6 @@ api = {
   wait_step = function() return wait_step end,
   wd = function() return working_directory end,
   --
-  set_block_size = function(n) assert(type(n) == "number") block_size = n end,
   set_engine = function(str) assert(type(str) == "string") engine = require ("parxe.engines."..str) end,
   set_max_number_tasks = function(n) assert(type(n) == "number") max_number_tasks = n end,
   set_min_task_len = function(n) assert(type(n) == "number") min_task_len = n end,

@@ -53,24 +53,6 @@ local function compute_task_split(object, engine)
   return N,M,K
 end
 
--- deserializes an object send by means of a stream file
-local function deserialize(f)
-  local config = require "parxe.config"
-  local line = f:read("*l") if not line then return end
-  local n = tonumber(line)
-  local bsize = config.block_size()
-  return util.deserialize{
-    read=function(_,m)
-      if n > 0 then
-        m = math.min(n, m)
-        local b = math.min(m, bsize)
-        n = n - b
-        return assert( f:read(b) )
-      end
-    end
-  }
-end
-
 -- returns a double number representing the current timestamp with a resolution
 -- up to microseconds
 local function gettime()
@@ -92,27 +74,8 @@ do
   local task_id = 0 function next_task_id() task_id = task_id + 1 return task_id end
 end
 
--- returns a coroutine which serializes a given object through the given stream
--- file, the coroutine returns true when serialization has been performed
-local function make_serializer(obj, f)
-  return coroutine.wrap(
-    function()
-      local config = require "parxe.config"
-      local str = util.serialize(obj)
-      local n   = #str
-      assert( f:write(n) )
-      assert( f:write("\n") )
-      local bsize = config.block_size()
-      for i=1,n,bsize do
-        assert( f:write(str:sub(i,math.min(n,i+config.block_size()-1))) )
-        f:flush()
-        coroutine.yield()
-      end
-      return true
-    end
-  )
-end
-
+-- generic wait method, receives a dictionary of pending_futures and executes
+-- wait in everyone until all are done
 local function parallel_engine_wait_method(pending_futures)
   repeat
     for id,f in pairs(pending_futures) do
@@ -153,10 +116,8 @@ end
 
 return {
   compute_task_split = compute_task_split,
-  deserialize = deserialize,
   gettime = gettime,
   hostname = hostname,
-  make_serializer = make_serializer,
   next_task_id = next_task_id,
   parallel_engine_wait_method = parallel_engine_wait_method,
   range_object = range_object,

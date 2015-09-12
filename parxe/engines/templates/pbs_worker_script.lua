@@ -45,3 +45,5 @@ if not ok then err,result=result,{} end
 serialize({ jobid=JOBID, id=id, result=result,
             err=err, hash=HASH, reply=true }, client)
 assert( deserialize(client) ) -- ASK
+xe.close(client)
+xe.term()

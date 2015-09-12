@@ -16,7 +16,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 local px = require "parxe"
-px.config.set_engine("fork")
+px.config.set_engine("local")
 -- mapping a table of data
 local f1 = px.map(function(x) return 2*x end, iterator.range(1024):table())
 -- mapping a matrix
