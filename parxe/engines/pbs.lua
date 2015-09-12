@@ -100,7 +100,7 @@ local function execute_qsub(wd, tmpname, f)
   qsub_in:write("echo \"# HASH:     %s\"\n"%{HASH})
   qsub_in:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
   qsub_in:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
-  qsub_in:write("%s -l parxe.engines.templates.pbs_worker_script -e ''\n"%{
+  qsub_in:write("%s -l parxe.engines.workers.pbs_worker_script -e ''\n"%{
                resources.appname,
   })
   qsub_in:close()

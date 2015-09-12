@@ -145,7 +145,7 @@ local function execute_worker(task)
   f._stdout_ = tmpname..".OU"
   f._stderr_ = tmpname..".ER"
   local cmd = "nohup %s -l %s -e \"RUN_WORKER('%s')\" > %s 2> %s & echo $!"%
-    { file, "parxe.engines.templates.local_worker_script", URI,
+    { file, "parxe.engines.workers.local_worker_script", URI,
       f._stdout_, f._stderr_  }
   local pipe = io.popen(cmd)
   local pid = tonumber(pipe:read("*l"))
