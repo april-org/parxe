@@ -206,15 +206,17 @@ end
 -- this function is given to pbs future objects in order to check when the data
 -- is available
 function check_worker()
-  local n = assert( xe.poll(poll_fds) )
-  if n > 0 then
-    for i,r in ipairs(poll_fds) do
-      if r.events == r.revents then
-        process_message(r.fd, r.revents)
-        r.revents = nil
+  repeat
+    local n = assert( xe.poll(poll_fds) )
+    if n > 0 then
+      for i,r in ipairs(poll_fds) do
+        if r.events == r.revents then
+          process_message(r.fd, r.revents)
+          r.revents = nil
+        end
       end
     end
-  end
+  until n == 0
   collectgarbage("collect")
 end
 
