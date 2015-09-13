@@ -155,18 +155,23 @@ config.set_engine("pbs")
 
 Other things which can be configured are:
 
-- `config.set_engine(ENGINE)` receives the name of the engine.
+- `config.set_clean_tmp_at_exit(boolean)` indicates if remove all stdout and
+  stderr files produced by task execution.
+
+- `config.set_engine(ENGINE)` receives the name of the engine, a string with
+  any of these values: "seq", "local", "pbs", "ssh".
 
 - `config.set_max_number_tasks(N)` sets a maximum number of concurrent tasks
-  you want to execute. By default it is set to 64.
+  you want to execute. By default it is set to 64. This number will prevail over
+  the maximum number of tasks declared by the engine.
 
 - `config.set_min_task_len(N)` map/reduce commands are split into slices with a
   minimum length number, which can be configured with this function. By default
   it is 32.
 
 - `config.set_tmp(PATH)` changes the temporary directory used by PARXE. For
-  cluster engines, like "pbs", it should be a shred folder between all your
-  machines.
+  cluster engines, like "pbs" or "ssh", it should be a shred folder between all
+  your machines. In this folder stdout and stderr outputs will be written.
 
 - `config.set_wait_step(SECONDS)` in order to not block the execution of Lua,
   all operations are performed with a wait timeout. The default value is
@@ -174,6 +179,8 @@ Other things which can be configured are:
 
 - `config.set_wd(PATH)` changes the working directory where PARXE workers will
   be executed. By default it is given by `pwd` OS  command.
+
+### PBS engine configuration
 
 Additionally, some engines, like the "pbs" engine, use resources from your
 computer or cluster which can be configured beforehand. To do that, you can
@@ -193,12 +200,24 @@ All this lines will be enqueued and executed in order just before execution
 of the worker application. The PBS resources available to be configured are:
 `mem`, `q`, `name`, `omp`, `appname`, `host`, `properties`. All of them are
 numbers or just a string with the resource, except properties which is a table
-of strings.
+of strings. Keep in mind that `appname` accepts an environment variable which
+will be expanded by the worker machine.
+
+### SSH engine configuration
 
 In "ssh" engine you can write a configure file at
 `$HOME/.parxe./default/ssh.lua` where it is possible to execute
 `append_shell_line()`, `set_resource()` with keys `omp`, `appname`, `host`, and
-`add_machine()` function.
+`add_machine()` function. Keep in mind that `appname` accepts an environment
+variable which will be expanded by the worker machine. For instance, the
+configuration script could be:
+
+```Lua
+local ssh = ...
+ssh:append_shell_line(". /etc/my-env-vars")
+ssh:set_resource("omp", 1)
+ssh:set_resource("appname", "$APRIL_EXEC")
+```
 
 ## Dependencies
 

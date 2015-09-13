@@ -85,16 +85,21 @@ local function execute_worker(machine_key, task)
     "cd "..task.wd,
     "export PARXE_SERVER="..resources.host,
     "export PARXE_SERVER_PORT="..resources.port,
-    "export PARXE_HASH='"..HASH.."'",
+    "export PARXE_HASH="..HASH,
     "export PARXE_TASKID="..task.id,
     "export OMP_NUM_THREADS="..resources.omp,
   }
   for _,v in pairs(shell_lines) do table.insert(command, v) end
   table.insert(command,
-               "nohup %s -l parxe.engines.workers.ssh_worker_script -e '' > %s 2> %s < /dev/null &"%
+               "if [[ -z %s ]]; then echo Impossible to expand appname; exit -1; fi"%{resources.appname})
+  table.insert(command,
+               'nohup %s -l parxe.engines.workers.ssh_worker_script -e "" > %s 2> %s < /dev/null &'%
                  { resources.appname, f._stdout_, f._stderr_, })
   local s = table.concat{ "ssh ", machines[machine_key],
-                          ' "', table.concat(command, ";"), '"'}
+                          " '",
+                          table.concat(command, ";"),
+                          "'"}
+  print(s)
   assert( os.execute(s) )
   -- return pid ????? Is it possible to control the SSH command?
 end
