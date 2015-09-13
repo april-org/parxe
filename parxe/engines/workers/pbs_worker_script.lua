@@ -27,9 +27,12 @@ local HOSTNAME = common.hostname()
 local JOBID    = assert( os.getenv("PBS_JOBID") )
 local PORT     = assert( tonumber( os.getenv("PARXE_SERVER_PORT") ) )
 local SERVER   = assert( os.getenv("PARXE_SERVER") )
+local TIMEOUT  = 1800000 -- 30 minutes in milliseconds
 print("# JOBID: ", JOBID)
 -- socket creation and connection
 local client = assert( xe.socket(xe.NN_REQ) )
+assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
+assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
 local endpoint = assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
 -- request a new job
 serialize({ jobid=JOBID, hash=HASH, request=true }, client)

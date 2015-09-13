@@ -21,12 +21,15 @@ local xe          = require "xemsg"
 local xe_utils    = require "parxe.xemsg_utils"
 local deserialize = xe_utils.deserialize
 local serialize   = xe_utils.serialize
-local PID = util.getpid()
+local PID         = util.getpid()
+local TIMEOUT     = 1800000 -- 30 minutes in milliseconds
 --
 function RUN_WORKER(URI)
   print("# URI: ", URI)
   -- socket creation and connection
   local client = assert( xe.socket(xe.NN_REQ) )
+  assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
+  assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
   local endpoint = assert( xe.connect(client, URI) )
   -- request a new job
   serialize({ pid=PID, request=true }, client)
