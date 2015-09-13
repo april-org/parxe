@@ -36,13 +36,8 @@ local HOSTNAME = common.hostname()
 ---------------------------------------------------------------------------
 
 local pbs,pbs_methods = class("parxe.engine.pbs")
-local singleton
 
 ---------------------------------------------------------------------------
-
--- Forward declaration of check_worker function (see at the end of the file) and
--- server socket.
-local check_worker,server,endpoint
 
 -- Used in xe.poll() function.
 local poll_fds = {}
@@ -62,6 +57,8 @@ local shell_lines = {}
 
 ---------------------------------------------------------------------------
 
+-- Forward declaration of server socket and binded endpoint identifier
+local server,endpoint
 -- initializes the nanomsg SP socket for REQ/REP pattern
 local function init()
   server = assert( xe.socket(xe.NN_REP) )
@@ -109,8 +106,74 @@ local function execute_qsub(wd, tmpname, f)
   return jobid
 end
 
+
+----------------------------- check worker helpers ---------------------------
+
+-- given a future object, serializes its associated task by means of server
+-- SP socket
+local function send_task(f)
+  local task = f.task
+  serialize(task, server)
+  f.task = nil
+  f._state_ = future.RUNNING_STATE
+end
+
+-- given a worker reply, returns a true to the worker and process the result
+-- modifying its corresponding future object
+local function process_reply(r)
+  serialize(true, server)
+  local f = pending_futures[r.jobid]
+  pending_futures[r.id] = nil
+  f._result_ = r.result or {false}
+  f._err_    = r.err
+  assert(f.jobid == r.jobid)
+  assert(f.task_id == r.id)
+end
+
+-- reads a message request from socket s and executes the corresponding response
+local function process_message(s, revents)
+  assert(revents == xe.NN_POLLIN)
+  if revents == xe.NN_POLLIN then
+    local cmd = deserialize(s)
+    assert(cmd.hash == HASH,
+           "Warning: unknown hash identifier, check that every server has a different port\n")
+    if cmd.request then
+      -- task request, send a reply with the task
+      send_task(pending_futures[cmd.jobid])
+    elseif cmd.reply then
+      -- task reply, read task result and send ack
+      process_reply(cmd)
+      if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
+      return true
+    else
+      error("Incorrect command")
+    end
+  end
+end
+
+------------------------ check worker function -------------------------------
+
+-- This function is the main one for future objects produced by pbs engine.
+-- This function is responsible of look-up for new incoming messages and
+-- dispatch its response by using process_message function.
+local function check_worker()
+  repeat
+    local n = assert( xe.poll(poll_fds) )
+    if n > 0 then
+      for i,r in ipairs(poll_fds) do
+        if r.events == r.revents then
+          process_message(r.fd, r.revents)
+          r.revents = nil
+        end
+      end
+    end
+  until n == 0
+  collectgarbage("collect")
+end
+
 ---------------------------------------------------------------------------
 
+-- The pbs engine class, exported as result of this module.
 function pbs:constructor()
 end
 
@@ -161,68 +224,9 @@ function pbs_methods:append_shell_line(value)
   table.insert(shell_lines, value)
 end
 
------------------------------ check worker helpers ---------------------------
-
-local function send_task(f)
-  local task = f.task
-  serialize(task, server)
-  f.task = nil
-  f._state_ = future.RUNNING_STATE
-end
-
-local function process_reply(r)
-  serialize(true, server)
-  local f = pending_futures[r.jobid]
-  pending_futures[r.id] = nil
-  f._result_ = r.result or {false}
-  f._err_    = r.err
-  assert(f.jobid == r.jobid)
-  assert(f.task_id == r.id)
-end
-
--- reads a message request from socket s and executes the corresponding response
-local function process_message(s, revents)
-  assert(revents == xe.NN_POLLIN)
-  if revents == xe.NN_POLLIN then
-    local cmd = deserialize(s)
-    assert(cmd.hash == HASH,
-           "Warning: unknown hash identifier, check that every server has a different port\n")
-    if cmd.request then
-      -- task request, send a reply with the task
-      send_task(pending_futures[cmd.jobid])
-    elseif cmd.reply then
-      -- task reply, read task result and send ack
-      process_reply(cmd)
-      if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
-      return true
-    else
-      error("Incorrect command")
-    end
-  end
-end
-
------------------------- check worker function -------------------------------
-
--- this function is given to pbs future objects in order to check when the data
--- is available
-function check_worker()
-  repeat
-    local n = assert( xe.poll(poll_fds) )
-    if n > 0 then
-      for i,r in ipairs(poll_fds) do
-        if r.events == r.revents then
-          process_message(r.fd, r.revents)
-          r.revents = nil
-        end
-      end
-    end
-  until n == 0
-  collectgarbage("collect")
-end
-
 ----------------------------------------------------------------------------
 
-singleton = pbs()
+local singleton = pbs()
 class.extend_metamethod(pbs, "__call", function() return singleton end)
 common.user_conf("pbs.lua", singleton)
 init()

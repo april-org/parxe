@@ -32,18 +32,12 @@ local deserialize = xe_utils.deserialize
 -- is used to  identify client connections in order to assert possible errors.
 local TMPNAME = os.tmpname()
 local HASH    = TMPNAME:match("^.*lua_(.*)$")
+
 -- nanomsg URI connection, using IPC transport
 local URI = "ipc://"..TMPNAME
----------------------------------------------------------------------------
 
-local local_engine,local_engine_methods = class("parxe.engine.local")
+-- number of cores available in local machine
 local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
-local singleton
-  
----------------------------------------------------------------------------
-
--- Forward declaration of check_worker function (see at the end of the file).
-local check_worker
 
 -- A table with all the futures related with executed processes. The table is
 -- indexed as a dictionary using task_id as keys.
@@ -56,17 +50,121 @@ local pending_tasks = {}
 local running_workers = {}
 local num_running_workers = 0 -- it should be less or equal to num_cores
 
----------------------------------------------------------------------------
-
+-- server socket binded to URI address
 local server = assert( xe.socket(xe.NN_REP) )
 local endpoint = assert( xe.bind(server, URI) )
+
 -- Used in xe.poll() function.
 local poll_fds = {
   { fd = server, events = xe.NN_POLLIN }
 }
 
+----------------------------- check worker helpers ---------------------------
+
+-- given a future object, serializes its associated task by means of server
+-- SP socket
+local function send_task(f)
+  local task = f.task
+  serialize(task, server)
+  f.task = nil
+  f._state_ = future.RUNNING_STATE
+end
+
+-- given a worker reply, returns a true to the worker and process the result
+-- modifying its corresponding future object; additionally it waits until worker
+-- process termination
+local function process_reply(r)
+  serialize(true, server)
+  local f = pending_futures[r.id]
+  pending_futures[r.id] = nil
+  running_workers[r.pid] = nil
+  f._result_ = r.result or {false}
+  f._err_    = r.err
+  util.wait()
+  assert(f.pid == r.pid)
+  assert(f.task_id == r.id)
+  num_running_workers = num_running_workers - 1
+end
+
+-- reads a message request from socket s and executes the corresponding
+-- response, which can be send_task or process_reply
+local function process_message(s, revents)
+  assert(revents == xe.NN_POLLIN)
+  if revents == xe.NN_POLLIN then
+    local cmd = deserialize(s)
+    if cmd.request then
+      -- task request, send a reply with the task
+      send_task(pending_futures[running_workers[cmd.pid]])
+    elseif cmd.reply then
+      -- task reply, read task result and send ack
+      process_reply(cmd)
+      if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
+      return true
+    else
+      error("Incorrect command")
+    end
+  end
+end
+
+-- Executes the worker with a given task description in a new background
+-- process. Uses nohup to send the process in background. Additionally, fills
+-- the corresponding future object with _stdout_ and _stderr_ filenames and
+-- keeps tracks of the new running worker.
+local function execute_worker(task)
+  --local which,pid = util.split_process(2)
+  --if not pid then
+  local file = assert(arg[-1], "Unable to locate executable at arg[-1]")
+  local tmp = config.tmp()
+  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task.id,os.date("%Y%m%d%H%M%S")}
+  local f = pending_futures[task.id]
+  f._stdout_ = tmpname..".OU"
+  f._stderr_ = tmpname..".ER"
+  local cmd = "nohup %s -l %s -e \"RUN_WORKER('%s')\" > %s 2> %s & echo $!"%
+    { file, "parxe.engines.workers.local_worker_script", URI,
+      f._stdout_, f._stderr_  }
+  local pipe = io.popen(cmd)
+  local pid = tonumber(pipe:read("*l"))
+  pipe:close()
+  --end
+  assert(pid >= 0, "Unexpected PID < 0")
+  -- parent code, keep track of pid and task_id for error checking
+  f.pid = pid
+  running_workers[pid] = task.id
+  num_running_workers = num_running_workers + 1
+end
+
+------------------------ check worker function -------------------------------
+
+-- This function is the main one for future objects produced by local engine.
+-- This function is responsible of execute workers associated with pending
+-- tasks, look-up for new incoming messages and dispatch its response by using
+-- process_message function.
+local function check_worker()
+  while #pending_tasks > 0 and num_running_workers < num_cores do
+    execute_worker(table.remove(pending_tasks, 1))
+  end
+  -- TODO: error checking
+  -- for pid,task_id in pairs(running_workers) do
+  --   assert( os.execute("kill 0 " .. pid) )
+  -- end
+  repeat
+    local n = assert( xe.poll(poll_fds) )
+    if n > 0 then
+      for i,r in ipairs(poll_fds) do
+        if r.events == r.revents then
+          process_message(r.fd, r.revents)
+          r.revents = nil
+        end
+      end
+    end
+  until n == 0
+  collectgarbage("collect")
+end
+
 ---------------------------------------------------------------------------
 
+-- The local engine class, exported as result of this module.
+local local_engine,local_engine_methods = class("parxe.engine.local")
 function local_engine:constructor()
 end
 
@@ -94,96 +192,8 @@ end
 
 function local_engine_methods:get_max_tasks() return num_cores end
 
------------------------------ check worker helpers ---------------------------
-
-local function send_task(f)
-  local task = f.task
-  serialize(task, server)
-  f.task = nil
-  f._state_ = future.RUNNING_STATE
-end
-
-local function process_reply(r)
-  serialize(true, server)
-  local f = pending_futures[r.id]
-  pending_futures[r.id] = nil
-  running_workers[r.pid] = nil
-  f._result_ = r.result or {false}
-  f._err_    = r.err
-  util.wait()
-  assert(f.pid == r.pid)
-  assert(f.task_id == r.id)
-  num_running_workers = num_running_workers - 1
-end
-
--- reads a message request from socket s and executes the corresponding response
-local function process_message(s, revents)
-  assert(revents == xe.NN_POLLIN)
-  if revents == xe.NN_POLLIN then
-    local cmd = deserialize(s)
-    if cmd.request then
-      -- task request, send a reply with the task
-      send_task(pending_futures[running_workers[cmd.pid]])
-    elseif cmd.reply then
-      -- task reply, read task result and send ack
-      process_reply(cmd)
-      if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
-      return true
-    else
-      error("Incorrect command")
-    end
-  end
-end
-
-local function execute_worker(task)
-  --local which,pid = util.split_process(2)
-  --if not pid then
-  local file = assert(arg[-1], "Unable to locate executable at arg[-1]")
-  local tmp = config.tmp()
-  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task.id,os.date("%Y%m%d%H%M%S")}
-  local f = pending_futures[task.id]
-  f._stdout_ = tmpname..".OU"
-  f._stderr_ = tmpname..".ER"
-  local cmd = "nohup %s -l %s -e \"RUN_WORKER('%s')\" > %s 2> %s & echo $!"%
-    { file, "parxe.engines.workers.local_worker_script", URI,
-      f._stdout_, f._stderr_  }
-  local pipe = io.popen(cmd)
-  local pid = tonumber(pipe:read("*l"))
-  pipe:close()
-  --end
-  assert(pid >= 0, "Unexpected PID < 0")
-  -- parent code, keep track of pid and task_id for error checking
-  f.pid = pid
-  running_workers[pid] = task.id
-  num_running_workers = num_running_workers + 1
-end
-
------------------------- check worker function -------------------------------
-
-function check_worker()
-  while #pending_tasks > 0 and num_running_workers < num_cores do
-    execute_worker(table.remove(pending_tasks, 1))
-  end
-  -- TODO: error checking
-  -- for pid,task_id in pairs(running_workers) do
-  --   assert( os.execute("kill 0 " .. pid) )
-  -- end
-  repeat
-    local n = assert( xe.poll(poll_fds) )
-    if n > 0 then
-      for i,r in ipairs(poll_fds) do
-        if r.events == r.revents then
-          process_message(r.fd, r.revents)
-          r.revents = nil
-        end
-      end
-    end
-  until n == 0
-  collectgarbage("collect")
-end
-
 ----------------------------------------------------------------------------
 
-singleton = local_engine() -- local variable taken from the header of this file
+local singleton = local_engine() -- local variable taken from the header of this file
 class.extend_metamethod(local_engine, "__call", function() return singleton end)
 return singleton
