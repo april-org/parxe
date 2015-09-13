@@ -35,25 +35,27 @@ local HASH     = TMPNAME:match("^.*lua_(.*)$")
 local HOSTNAME = common.hostname()
 ---------------------------------------------------------------------------
 
-local pbs,pbs_methods = class("parxe.engine.pbs")
-
----------------------------------------------------------------------------
+-- List of available machines. If one machine has multiple cores, you should put
+-- it several times in this list. By default the list is empty.
+local machines = {}
+-- List of idle machines.
+local idle_machines = {}
+local num_remote_cores = 0
 
 -- Used in xe.poll() function.
 local poll_fds = {}
 
 -- A table with all the futures related with executed processes. The table is
--- indexed as a dictionary using PBS jobids as keys.
+-- indexed as a dictionary using task_id as keys.
 local pending_futures = {}
+local pending_tasks = {}
 
--- Table with all allowed resources for PBS configuration. They can be setup
--- by means of set_resource method in pbs engine object.
-local allowed_resources = { mem=true, q=true, name=true, omp=true,
-                            appname=true, host=true, properties = true }
--- Value of resources for PBS configuration.
-local resources = { appname="april-ann", host=HOSTNAME, port=1234, omp=1,
-                    mem="1g" }
--- Lines of shell script to be executed by PBS script before running worker
+-- Table with all allowed resources for SSH configuration. They can be setup
+-- by means of set_resource method in ssh engine object.
+local allowed_resources = { omp=true, appname=true, host=true }
+-- Value of resources for SSH configuration.
+local resources = { omp=1, appname="april-ann", host=HOSTNAME, port=2345 }
+-- Lines of shell script to be executed by SSH script before running worker
 local shell_lines = {}
 
 ---------------------------------------------------------------------------
@@ -61,54 +63,41 @@ local shell_lines = {}
 -- Forward declaration of server socket and binded endpoint identifier
 local server,endpoint
 -- initializes the nanomsg SP socket for REQ/REP pattern
-local function init(port)
-  if not server or port then
+local function init()
+  if not server then
     server = assert( xe.socket(xe.NN_REP) )
     endpoint = assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
     poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
   end
 end
 
-local function concat_properties(props)
-  if not props or #props==0 then return "" end
-  return ":" .. table.concat(props, ":")
+-- Executes ssh passing it the worker script and resources
+-- configuration.
+local function execute_worker(machine_key, task)
+  local tmp = config.tmp()
+  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task.id,os.date("%Y%m%d%H%M%S")}
+  local f = pending_futures[task.id]
+  f._stdout_ = tmpname..".OU"
+  f._stderr_ = tmpname..".ER"
+  f.machine  = machine_key
+  local command = {
+    "source ~/.bashrc",
+    "cd "..task.wd,
+    "export PARXE_SERVER="..resources.host,
+    "export PARXE_SERVER_PORT="..resources.port,
+    "export PARXE_HASH='"..HASH.."'",
+    "export PARXE_TASKID="..task.id,
+    "export OMP_NUM_THREADS="..resources.omp,
+  }
+  for _,v in pairs(shell_lines) do table.insert(command, v) end
+  table.insert(command,
+               "nohup %s -l parxe.engines.workers.ssh_worker_script -e '' > %s 2> %s < /dev/null &"%
+                 { resources.appname, f._stdout_, f._stderr_, })
+  local s = table.concat{ "ssh ", machines[machine_key],
+                          ' "', table.concat(command, ";"), '"'}
+  assert( os.execute(s) )
+  -- return pid ????? Is it possible to control the SSH command?
 end
-
--- Executes qsub passing it the worker script and resources
--- configuration. Returns the jobid of the queued worker.
-local function execute_qsub(wd, tmpname, f)
-  local qsub_in,qsub_out = assert( io.popen2("qsub -N %s"%{resources.name or tmpname}) )
-  qsub_in:write("#PBS -l nice=19\n")
-  qsub_in:write("#PBS -l nodes=1:ppn=%d%s,mem=%s\n"%{resources.omp,
-                                                     concat_properties(resources.properties),
-                                                     resources.mem})
-  if resources.q then qsub_in:write("#PBS -q %s\n"%{resources.q}) end
-  qsub_in:write("#PBS -m a\n")
-  qsub_in:write("#PBS -o %s\n"%{f._stdout_})
-  qsub_in:write("#PBS -e %s\n"%{f._stderr_})
-  for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
-  qsub_in:write("cd %s\n"%{wd})
-  qsub_in:write("export OMP_NUM_THREADS=%d\n"%{resources.omp})
-  qsub_in:write("export PARXE_SERVER=%s\n"%{resources.host})
-  qsub_in:write("export PARXE_SERVER_PORT=%d\n"%{resources.port})
-  qsub_in:write("export PARXE_HASH=%s\n"%{HASH})
-  qsub_in:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
-  qsub_in:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
-  qsub_in:write("echo \"# DATE:     $(date)\"\n")
-  qsub_in:write("echo \"# SERVER:   %s\"\n"%{resources.host})
-  qsub_in:write("echo \"# PORT:     %d\"\n"%{resources.port})
-  qsub_in:write("echo \"# HASH:     %s\"\n"%{HASH})
-  qsub_in:write("echo \"# TMPNAME:  %s\"\n"%{tmpname})
-  qsub_in:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
-  qsub_in:write("%s -l parxe.engines.workers.pbs_worker_script -e ''\n"%{
-               resources.appname,
-  })
-  qsub_in:close()
-  local jobid = qsub_out:read("*l")
-  qsub_out:close()
-  return jobid
-end
-
 
 ----------------------------- check worker helpers ---------------------------
 
@@ -125,10 +114,11 @@ end
 -- modifying its corresponding future object
 local function process_reply(r)
   serialize(true, server)
-  local f = pending_futures[r.jobid]
+  local f = pending_futures[r.id]
   pending_futures[r.id] = nil
   f._result_ = r.result or {false}
   f._err_    = r.err
+  table.insert(idle_machines, f.machine)
   assert(f.jobid == r.jobid)
   assert(f.task_id == r.id)
 end
@@ -142,7 +132,7 @@ local function process_message(s, revents)
            "Warning: unknown hash identifier, check that every server has a different port\n")
     if cmd.request then
       -- task request, send a reply with the task
-      send_task(pending_futures[cmd.jobid])
+      send_task(pending_futures[cmd.id])
     elseif cmd.reply then
       -- task reply, read task result and send ack
       process_reply(cmd)
@@ -156,10 +146,15 @@ end
 
 ------------------------ check worker function -------------------------------
 
--- This function is the main one for future objects produced by pbs engine.
--- This function is responsible of look-up for new incoming messages and
--- dispatch its response by using process_message function.
+-- This function is the main one for future objects produced by local engine.
+-- This function is responsible of execute workers associated with pending
+-- tasks, look-up for new incoming messages and dispatch its response by using
+-- process_message function.
 local function check_worker()
+  while #pending_tasks > 0 and #idle_machines > 0 do
+    execute_worker(table.remove(idle_machines, 1),
+                   table.remove(pending_tasks, 1))
+  end
   repeat
     local n = assert( xe.poll(poll_fds) )
     if n > 0 then
@@ -176,23 +171,25 @@ end
 
 ---------------------------------------------------------------------------
 
--- The pbs engine class, exported as result of this module.
-function pbs:constructor()
+-- The ssh engine class, exported as result of this module.
+local ssh,ssh_methods = class("parxe.engine.ssh")
+
+function ssh:constructor()
 end
 
-function pbs:destructor()
-  if server then
-    xe.shutdown(server, endpoint)
-    xe.close(server)
-    xe.term()
-  end
+function ssh:destructor()
+  xe.shutdown(server, endpoint)
+  xe.close(server)
+  xe.term()
   os.remove(TMPNAME)
 end
 
 -- configures a future object to perform the given operation func(...), assigns
 -- the future object a task_id and keeps it in pending_futures[jobid], being
--- jobid the PBS jobid as returned by execute_qsub() function
-function pbs_methods:execute(func, ...)
+-- jobid the SSH jobid as returned by execute_qsub() function
+function ssh_methods:execute(func, ...)
+  assert(num_remote_cores>0,
+         "At least one machine with one core is needed, configure the engine by using function px.config.engine():add_machine(login,num_cores)")
   init()
   local args    = table.pack(...)
   local task_id = common.next_task_id()
@@ -202,24 +199,24 @@ function pbs_methods:execute(func, ...)
   f._stdout_  = tmpname..".OU"
   f._stderr_  = tmpname..".ER"
   f.tmpname   = tmpname
-  f.jobid     = execute_qsub(config.wd(), tmpname, f)
   f.task_id   = task_id
-  pending_futures[f.jobid] = f
+  pending_futures[task_id] = f
   local task = { id=task_id, func=func, args=args, wd=config.wd() }
   f.task = task
+  table.insert(pending_tasks, task)
   return f
 end
 
 -- waits until all futures are ready
-function pbs_methods:wait()
+function ssh_methods:wait()
   parallel_engine_wait_method(pending_futures)
 end
 
--- no limit due to PBS
-function pbs_methods:get_max_tasks() return math.huge end
+-- no limit due to SSH
+function ssh_methods:get_max_tasks() return num_remote_cores end
 
--- configure PBS resources for qsub script configuration
-function pbs_methods:set_resource(key, value)
+-- configure SSH resources
+function ssh_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
   resources[key] = value
   if key == "port" and server then
@@ -227,14 +224,25 @@ function pbs_methods:set_resource(key, value)
   end
 end
 
--- appends a new shell line which will be executed by qsub script
-function pbs_methods:append_shell_line(value)
+-- appends a new shell line which will be executed before running the worker
+function ssh_methods:append_shell_line(value)
   table.insert(shell_lines, value)
+end
+
+-- adds a new machine given the login@host credential and the number of cores
+function ssh_methods:add_machine(login_host, num_cores)
+  for i=1,num_cores or 1 do
+    local machine_key = login_host.."_"..i
+    assert(not machines[machine_key])
+    machines[machine_key] = login_host
+    table.insert(idle_machines, machine_key)
+    num_remote_cores = num_remote_cores + 1
+  end
 end
 
 ----------------------------------------------------------------------------
 
-local singleton = pbs()
-class.extend_metamethod(pbs, "__call", function() return singleton end)
-common.user_conf("pbs.lua", singleton)
+local singleton = ssh()
+class.extend_metamethod(ssh, "__call", function() return singleton end)
+common.user_conf("ssh.lua", singleton)
 return singleton

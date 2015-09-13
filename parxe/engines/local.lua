@@ -50,14 +50,20 @@ local pending_tasks = {}
 local running_workers = {}
 local num_running_workers = 0 -- it should be less or equal to num_cores
 
--- server socket binded to URI address
-local server = assert( xe.socket(xe.NN_REP) )
-local endpoint = assert( xe.bind(server, URI) )
-
 -- Used in xe.poll() function.
-local poll_fds = {
-  { fd = server, events = xe.NN_POLLIN }
-}
+local poll_fds = {}
+
+-- server socket binded to URI address
+local server,endpoint
+local function init(force)
+  if not server or force then
+    server = assert( xe.socket(xe.NN_REP) )
+    endpoint = assert( xe.bind(server, URI) )
+    -- Used in xe.poll() function.
+    poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
+  end
+end
+  
 
 ----------------------------- check worker helpers ---------------------------
 
@@ -169,14 +175,17 @@ function local_engine:constructor()
 end
 
 function local_engine:destructor()
-  xe.shutdown(server, endpoint)
-  xe.close(server)
-  xe.term()
-  util.wait()
+  if server then
+    xe.shutdown(server, endpoint)
+    xe.close(server)
+    xe.term()
+    util.wait()
+  end
   os.remove(TMPNAME)
 end
 
 function local_engine_methods:execute(func, ...)
+  init()
   local args = table.pack(...)
   local f    = future(check_worker)
   f.task_id  = common.next_task_id()

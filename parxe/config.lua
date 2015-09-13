@@ -23,6 +23,7 @@ local common = require "parxe.common"
 
 local engine            -- the parallel engine configured and selected by the
                         -- user
+local engine_string    = "seq"
 local max_number_tasks = 64 -- maximum number of tasks to perform a computation
                             -- (map/reduce over an object)
 local min_task_len = 32 -- minimum length of any task
@@ -44,15 +45,22 @@ update_wd()
 -- interface table to retrieve and update config variables
 local api
 api = {
-  init = function() common.user_conf("config.lua", api) engine = engine or require "parxe.engines.seq" return api end,
-  engine = function() return engine end,
+  init = function() common.user_conf("config.lua", api) return api end,
+  engine = function()
+    engine = engine or require ("parxe.engines."..engine_string)
+    return engine
+  end,
   max_number_tasks = function() return max_number_tasks end,
   min_task_len = function() return min_task_len end,
   tmp = function() return tmp end,
   wait_step = function() return wait_step end,
   wd = function() return working_directory end,
   --
-  set_engine = function(str) assert(type(str) == "string") engine = require ("parxe.engines."..str) end,
+  set_engine = function(str)
+    assert(type(str) == "string")
+    assert(not engine, "Unable to change the engine after any task execution")
+    engine_string = str
+  end,
   set_max_number_tasks = function(n) assert(type(n) == "number") max_number_tasks = n end,
   set_min_task_len = function(n) assert(type(n) == "number") min_task_len = n end,
   set_tmp = function(str) assert(type(str) == "string") tmp = str end,

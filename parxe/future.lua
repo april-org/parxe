@@ -77,7 +77,7 @@ local function wait_exists(filename)
             NFS_WAIT_STEP, elapsed_time(t0))
     util.sleep(NFS_WAIT_STEP)
     if elapsed_time(t0) > NFS_TIMEOUT then
-      fprintf(io.stderr, "Wait timedout!\n")
+      fprintf(io.stderr, "# Wait timedout!\n")
       TIMEDOUT=true
       break
     end

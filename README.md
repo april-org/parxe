@@ -132,6 +132,12 @@ three engines available:
   uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg TCP transport to
   communication between processes.
 
+- "ssh" uses `ssh` with private/public key credentials to run commands in remote
+  hosts. It uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg TCP
+  transport to communication between processes. This engine needs at least
+  one machine with one core to work, so you need to execute at least once
+  `px.config.engine():add_machine(login,num_cores)`.
+
 ## Default configuration
 
 Some configuration parameters can be setup before the execution of any command
@@ -188,6 +194,11 @@ of the worker application. The PBS resources available to be configured are:
 `mem`, `q`, `name`, `omp`, `appname`, `host`, `properties`. All of them are
 numbers or just a string with the resource, except properties which is a table
 of strings.
+
+In "ssh" engine you can write a configure file at
+`$HOME/.parxe./default/ssh.lua` where it is possible to execute
+`append_shell_line()`, `set_resource()` with keys `omp`, `appname`, `host`, and
+`add_machine()` function.
 
 ## Dependencies
 
