@@ -87,8 +87,10 @@ local function wait_exists(filename)
 end
 
 function future:destructor()
-  if self._stdout_ then wait_exists(self._stdout_) os.remove(self._stdout_) end
-  if self._stderr_ then wait_exists(self._stderr_) os.remove(self._stderr_) end
+  if config.clean_tmp_at_exit() then
+    if self._stdout_ then wait_exists(self._stdout_) os.remove(self._stdout_) end
+    if self._stderr_ then wait_exists(self._stderr_) os.remove(self._stderr_) end
+  end
 end
 
 -- waits until timeout (or infinity if not given) and returns true in case data

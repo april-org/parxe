@@ -21,6 +21,7 @@ local common = require "parxe.common"
 -- config variables, they are private to this module, and can be changed through
 -- the exported functions
 
+local clean_tmp_at_exit = true -- indicates if tmp directory should be clean
 local engine            -- the parallel engine configured and selected by the
                         -- user
 local engine_string    = "seq"
@@ -46,6 +47,8 @@ update_wd()
 local api
 api = {
   init = function() common.user_conf("config.lua", api) return api end,
+  --
+  clean_tmp_at_exit = function() return clean_tmp_at_exit end,
   engine = function()
     engine = engine or require ("parxe.engines."..engine_string)
     return engine
@@ -56,6 +59,7 @@ api = {
   wait_step = function() return wait_step end,
   wd = function() return working_directory end,
   --
+  set_clean_tmp_at_exit = function(v) clean_tmp_at_exit = v end,
   set_engine = function(str)
     assert(type(str) == "string")
     assert(not engine, "Unable to change the engine after any task execution")
