@@ -18,6 +18,16 @@
 local common = require "parxe.common"
 local config = require "parxe.config"
 
+local PENDING_STATE = "PENDING"
+local RUNNING_STATE = "RUNNING"
+local READY_STATE   = "READY"
+  
+local VALID_STATES = {
+  [PENDING_STATE] = true,
+  [RUNNING_STATE] = true,
+  [READY_STATE]   = true,
+}
+
 -- Future objects are the result of executing parllel functions. They doesn't
 -- contain any value, but the application can be stopped waiting the value in
 -- case it is necessary. This objects wrap some data needed to check when the
@@ -29,6 +39,8 @@ local config = require "parxe.config"
 --   _err_    will contain a string with errors captured at workers
 --   _stdout_ will contain a filename where stdout can be retrieved from
 --   _stderr_ will contain a filename where stderr can be retrieved from
+--   _state_ contains a string with "pending", "running", "ready"
+  
 local future,future_methods = class("parxe.future")
 
 -- useful functions and variables
@@ -44,16 +56,14 @@ local NFS_WAIT_STEP =  1 -- seconds
 -- print of any future object indicates it is a future object and its data is
 -- ready or not
 class.extend_metamethod(future, "__tostring", function(self)
-                          if self._result_ then
-                            return "future: ready"
-                          end
-                          return "future: not ready, use wait or any get method"
+                          return table.concat{"future in ",self:get_state()," state"}
 end)
 
 -- do_work is a function responsible for checking when data is available, and
 -- responsible of setting the computation result at field _result_
 function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
+  self._state_ = PENDING_STATE
 end
 
 -- implement wait until filename is synchronized by NFS or similar shared
@@ -93,6 +103,19 @@ function future_methods:wait(timeout, sleep_step)
   return self:ready()
 end
 
+-- waits until timeout (or until state is RUNNING_STATE or READY_STATE) and
+-- returns the state of the object
+function future_methods:wait_until_running(timeout, sleep_step)
+  timeout = timeout or math.huge
+  sleep_step = sleep_step or config.wait_step()
+  local util_sleep = util.sleep
+  local t0_sec = gettime()
+  while not self:ready() and self:get_state() == PENDING_STATE and elapsed_time(t0_sec) < timeout do
+    util_sleep(sleep_step)
+  end
+  return self:get_state()
+end
+
 -- waits until data is available and returns it
 function future_methods:get()
   if not self._result_ then self:wait() end
@@ -128,7 +151,15 @@ end
 -- does some work and indicates if the result is ready or not
 function future_methods:ready()
   self:_do_work_()
-  return self._result_ ~= nil
+  assert( VALID_STATES[self._state_] )
+  local is_ready = self._result_ ~= nil
+  if is_ready then self._state_ = READY_STATE end
+  return is_ready
+end
+
+-- returns the state of the object
+function future_methods:get_state()
+  return assert( self._state_ )
 end
 
 -- currently this is not implemented :(
@@ -209,10 +240,13 @@ end
 -- executes ready() function over all futures, in case all are ready, it inserts
 -- all the results into a table and assigns _result_ field
 local all_do_work = function(self)
-  local all_ready = true
+  local all_ready   = true
+  local all_running = true
   for i,f in ipairs(self.data) do
     if not f:ready() then all_ready = false end
+    if f:get_state() ~= RUNNING_STATE then all_running = false end
   end
+  if all_running then self._state_ = RUNNING_STATE end
   if not all_ready then return false end
   -- the code below is executed once all futures are ready
   local result = {}
@@ -250,8 +284,13 @@ end
 
 -- checks the viability of data in the future object at data field
 local conditioned_do_work = function(self)
+  self._state_ = self.data:get_state()
   if self.data:ready() then
-    local data = self.func( self.data:get(), table.unpack(self.args) )
+    self._state_ = PENDING_STATE
+    for i,v in pairs(self.args) do
+      if class.is_a(v,future) then self.args[i] = v:get() end
+    end
+    local data = self.func( table.unpack(self.args) )
     if not class.is_a(data, future) then
       self._result_ = data
     end
@@ -260,12 +299,15 @@ end
 
 -- configures a future object which runs conditioned_do_work function and
 -- contains another future object
-function future.conditioned(func, other, ...)
-  assert(class.is_a(other, future), "Needs a future as second argument")
+function future.conditioned(func, ...)
   local f = future(conditioned_do_work)
   f.func = func
-  f.data = other
   f.args = table.pack(...)
+  local f_tbl = {}
+  for i,v in pairs(f_tbl) do
+    if class.is_a(v,future) then table.insert(f_tbl,v) end
+  end
+  f.data = future.all(f_tbl)
   return f
 end
 
@@ -275,9 +317,14 @@ end
 function future.value(v)
   local f = future()
   f._result_ = v
+  f._state_  = READY_STATE
   return f
 end
 
 -------------------------------------------------------------------------
+
+future.PENDING_STATE = PENDING_STATE
+future.RUNNING_STATE = RUNNING_STATE
+future.READY_STATE   = READY_STATE
 
 return future

@@ -167,6 +167,7 @@ local function send_task(f)
   local task = f.task
   serialize(task, server)
   f.task = nil
+  f._state_ = future.RUNNING_STATE
 end
 
 local function process_reply(r)

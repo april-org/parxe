@@ -99,7 +99,8 @@ you can use the wrapper `px.future.value`:
 ```
 
 Even more, it is possible to condition the execution of a function to the
-evaluation of a future object, using `px.future.conditioned` as in:
+evaluation of a list of future object or values, using `px.future.conditioned`
+as in:
 
 ```Lua
 > px = require "parxe"
@@ -107,7 +108,7 @@ evaluation of a future object, using `px.future.conditioned` as in:
 > fc = px.future.conditioned
 > f1 = px.run(function() return matrix(1024):linspace():sum() end)
 > f2 = px.run(function() return matrix(2048):linspace():sum() end)
-> f3 = fc(function(x) return x/2 end, f1 + f2 + fv(20))
+> f3 = fc(function(f1,f2,a) return (f1+f2+a)/2 end, f1, f2, 20)
 > px.config.engine():wait()
 > print(f3:get())
 1311498
