@@ -73,7 +73,7 @@ local function wait_exists(filename)
   local t0 = gettime()
   while not io.open(filename) and not TIMEDOUT do
     fprintf(io.stderr,
-            "# Waiting disk sync for tmp cleaning: %.0f s more, %.0f s elapsed \n",
+            "# Waiting disk sync: %.0f s more, %.0f s elapsed \n",
             NFS_WAIT_STEP, elapsed_time(t0))
     util.sleep(NFS_WAIT_STEP)
     if elapsed_time(t0) > NFS_TIMEOUT then
@@ -83,6 +83,7 @@ local function wait_exists(filename)
     end
     NFS_WAIT_STEP = NFS_WAIT_STEP + 1
   end
+  return not TIMEDOUT -- true in case of success or false in case of timeout
 end
 
 function future:destructor()
@@ -122,29 +123,32 @@ function future_methods:get()
   return self._result_
 end
 
--- read stderr file or _err_ field
+-- read stderr file content or _err_ field
 function future_methods:get_stderr()
   if not self._result_ then self:wait() end
   local err
   if not self._stderr_ then
     err = self._err_
   else
-    local f
-    repeat f = io.open(self._stderr_) util.sleep(config.wait_step()) until f
-    err = f:read("*a")
-    f:close()
+    if wait_exists(self._stderr_) then
+      local f = io.open(self._stderr_)
+      err = f:read("*a")
+      f:close()
+    end
   end
   return err or ""
 end
 
--- return stderr file
+-- return stdout file content
 function future_methods:get_stdout()
   if not self._result_ then self:wait() end
   if not self._stdout_ then return "" end
-  local f
-  repeat f = io.open(self._stdout_) util.sleep(config.wait_step()) until f
-  local out = f:read("*a")
-  f:close()
+  local out
+  if wait_exists(self._stdout_) then
+    local f = io.open(self._stdout_)
+    out = f:read("*a")
+    f:close()
+  end
   return out
 end
 
