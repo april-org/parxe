@@ -106,7 +106,8 @@ end
 local function send_task(f)
   local task = f.task
   serialize(task, server)
-  f.task = nil
+  f.task    = nil
+  f.host    = machines[f.machine]:match("^([^@]+)$")
   f._state_ = future.RUNNING_STATE
 end
 

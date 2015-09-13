@@ -72,7 +72,8 @@ end
 local function send_task(f)
   local task = f.task
   serialize(task, server)
-  f.task = nil
+  f.task    = nil
+  f.host    = "localhost"
   f._state_ = future.RUNNING_STATE
 end
 

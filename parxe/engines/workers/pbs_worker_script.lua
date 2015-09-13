@@ -35,7 +35,7 @@ assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
 assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
 local endpoint = assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
 -- request a new job
-serialize({ jobid=JOBID, hash=HASH, request=true }, client)
+serialize({ jobid=JOBID, hash=HASH, host=HOSTNAME, request=true }, client)
 -- response with task data
 local task = deserialize(client)
 local func, args, id = task.func, task.args, task.id

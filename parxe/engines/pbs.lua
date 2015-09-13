@@ -114,10 +114,11 @@ end
 
 -- given a future object, serializes its associated task by means of server
 -- SP socket
-local function send_task(f)
+local function send_task(f, host)
   local task = f.task
   serialize(task, server)
-  f.task = nil
+  f.task    = nil
+  f.host    = host
   f._state_ = future.RUNNING_STATE
 end
 
@@ -142,7 +143,7 @@ local function process_message(s, revents)
            "Warning: unknown hash identifier, check that every server has a different port\n")
     if cmd.request then
       -- task request, send a reply with the task
-      send_task(pending_futures[cmd.jobid])
+      send_task(pending_futures[cmd.jobid], cmd.host)
     elseif cmd.reply then
       -- task reply, read task result and send ack
       process_reply(cmd)
