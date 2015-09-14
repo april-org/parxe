@@ -27,7 +27,7 @@ In the same way, you can perform a reduce operation:
 ```Lua
 > px = require "parxe"
 > f  = px.reduce.self_distributive(function(a,b) return a+b end,
-                                   {1,2,3,4,5,6}, 0)
+                                   {1,2,3,4,5,6})
 > x  = f:get()
 > print(x)
 21
@@ -36,9 +36,14 @@ In the same way, you can perform a reduce operation:
 Notice the call to `px.reduce.self_distributive`, which indicates that the given
 reducer is a commutative, associative and idempotent operation. When these three
 properties are true, the operation is said to be distributive over itself. In
-this case the reduce operation returns just a value.
+this case the reduce operation returns just a value and reduction is performed
+by halving the giving object by two in a binary tree of operations.
 
-Other reducers can be more complicated:
+Other reducers can be more complicated, so they are not distributive over
+itself, and reduce operation receives an aggregated value and a new value to
+aggregate. This reductions should receive an initial value as last argument and
+returns a table of intermediate aggregated values which need to be reduced
+again:
 
 ```Lua
 > px = require "parxe"
@@ -46,27 +51,29 @@ Other reducers can be more complicated:
 > f  = px.reduce(function(a,x) return a+x[1] end, t, 0)
 > x  = f:get()
 > print(table.concat(x, " "))
-21
-> y  = iterator(x):reduce(math.add)
-> print(y)
 528 1552 2576 3600 4624 5648 6672 7696
+> y = iterator(x):reduce(math.add, 0)
+> print(y)
+32896
 ```
 
-Any reduce operation needs to receive the initial value as last argument. Notice
-that initial value can be `nil` but should be given **explicitely**. In case of
-given `nil` as last argument, the operation takes the first slice of the object
-as the initial value of the aggregation. This can be useful for certain reduce
-functions where you don't know the properties of the aggregation result (for
-instance, when reducing a matrix, the shape of the aggregated matrix can be
+Notice that initial value can be `nil` but should be given **explicitly**. In
+case of given `nil` as last argument, the operation takes the first slice of the
+object as the initial value of the aggregation. This can be useful for certain
+reduce functions where you don't know the properties of the aggregation result
+(for instance, when reducing a matrix, the shape of the aggregated matrix can be
 unknown):
 
 ```Lua
 > px = require "parxe"
-> f  = px.reduce.self_distributive(function(a,b) return a+b end,
-                                   {1,2,3,4,5,6}, nil)
+> t  = iterator.range(256):map(function(x) return {x} end):table()
+> f  = px.reduce(function(a,x) return a+x[1] end, t, nil)
 > x  = f:get()
-> print(x)
-21
+> print(table.concat(x, " "))
+528 1552 2576 3600 4624 5648 6672 7696
+> y = iterator(x):reduce(math.add, 0)
+> print(y)
+32896
 ```
 
 Besides map and reduce, you can run any function into the parallel environment.

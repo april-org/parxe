@@ -44,7 +44,7 @@ local f = px.reduce(math.add, f, 0)
 local r = f:get()
 print(r)
 
-local f = px.reduce.self_distributive(function(a,x) return a+x end, iterator.range(1024):table(), 0)
+local f = px.reduce.self_distributive(function(a,b) return a+b end, iterator.range(1024):table())
 local r = f:get()
 print(r)
 
@@ -85,9 +85,9 @@ local f3 = px.future.conditioned(function(f1,f2,x) return (f1+f2+x)/2 end,
                                  f1, f2, 20)
 print(f3:get())
 
+print("Running bootstrap")
 local rnd = random(567)
 local errors = stats.dist.normal():sample(rnd,1000)
-
 local boot_result = px.boot{
   size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
   statistic = function(sample)
