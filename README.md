@@ -130,9 +130,9 @@ as in:
 1311498
 ```
 
-Finally, a bootstrapping function has been added to perform resampling over
-large computation clusters. This function is a replacement of `stats.boot()`
-function in APRIL-ANN, and it can be used as follows:
+Finally, the bootstrapping function `px.boot()` has been added to perform
+resampling using large computation clusters. This function is a replacement of
+`stats.boot()` function in APRIL-ANN, and it can be used as follows:
 
 ```Lua
 > px = require "parxe"
