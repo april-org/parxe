@@ -205,6 +205,7 @@ function pbs_methods:execute(func, ...)
   f.tmpname   = tmpname
   f.jobid     = execute_qsub(config.wd(), tmpname, f)
   f.task_id   = task_id
+  f.time      = common.gettime()
   pending_futures[f.jobid] = f
   local task = { id=task_id, func=func, args=args, wd=config.wd() }
   f.task = task

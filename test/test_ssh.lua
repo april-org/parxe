@@ -16,6 +16,9 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 local px = require "parxe"
+-- number of cores available in local machine
+local num_cores = tonumber( assert( io.popen("getconf _NPROCESSORS_ONLN") ):read("*l") )
+-- configure SSH engine
 px.config.set_engine("ssh")
-px.config.engine():add_machine("localhost", 4)
+px.config.engine():add_machine("localhost", num_cores)
 dofile("test/generic_test.lua")

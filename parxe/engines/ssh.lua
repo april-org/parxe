@@ -80,6 +80,7 @@ local function execute_worker(machine_key, task)
   f._stdout_ = tmpname..".OU"
   f._stderr_ = tmpname..".ER"
   f.machine  = machine_key
+  f.time     = common.gettime()
   local command = {
     "source ~/.bashrc",
     "cd "..task.wd,
@@ -99,7 +100,6 @@ local function execute_worker(machine_key, task)
                           " '",
                           table.concat(command, ";"),
                           "'"}
-  print(s)
   assert( os.execute(s) )
   -- return pid ????? Is it possible to control the SSH command?
 end

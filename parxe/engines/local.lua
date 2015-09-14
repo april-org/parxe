@@ -135,9 +135,10 @@ local function execute_worker(task)
   --end
   assert(pid >= 0, "Unexpected PID < 0")
   -- parent code, keep track of pid and task_id for error checking
-  f.pid = pid
+  f.pid  = pid
+  f.time = common.gettime()
   running_workers[pid] = task.id
-  num_running_workers = num_running_workers + 1
+  num_running_workers  = num_running_workers + 1
 end
 
 ------------------------ check worker function -------------------------------
