@@ -140,8 +140,8 @@ resampling using large computation clusters. This function is a replacement of
 > errors = stats.dist.normal():sample(rnd,1000)
 > boot_result = px.boot{
   size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
-  statistic = function(sample)
-    local s = errors:index(1, sample)
+  statistic = function(sample_indices)
+    local s = errors:index(1, sample_indices)
     local var,mean = stats.var(s)
     return mean,var
   end
@@ -154,6 +154,29 @@ resampling using large computation clusters. This function is a replacement of
 > print(m,p0,pn)
 -0.012237208895385	-0.11794531345367	0.09270916134119
 ```
+
+The function `px.boot()` receives a table with this fields:
+
+- `size=number or table` the sample population size, or a table with several
+  sample population sizes.
+
+- `R=number` the number of repetitions of the procedure.
+
+- `k=number` the number of results returned by `statistic` function. **By
+  default** it is 1.
+
+- `statistic=function` a function which receives a `matrixInt32` with a list of
+  indices for resampling the data. The function can compute a number of k
+  statistics (with k>=1), being returned as multiple results.
+
+- `verbose=false` an **optional** boolean indicating if you want or not a
+  verbose output. By default it is `false`.
+
+- `seed=1234` an **optional** number indicating the initial seed for random
+  numbers, by default it is `1234`.
+
+- `random` an **optional** random number generator. Fields `seed`
+  and `random` are forbidden together, only one can be indicated.
 
 ## Engines
 
