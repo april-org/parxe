@@ -12,3 +12,7 @@
   object.
 
 - Use time field in future objects to control timeout or connections problems.
+
+- In qsub engine, cancel all pending/executing jobs in PBS when exiting the
+  program.
+
