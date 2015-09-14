@@ -86,7 +86,7 @@ local f3 = px.future.conditioned(function(f1,f2,x) return (f1+f2+x)/2 end,
 print(f3:get())
 
 local rnd = random(567)
-local errors = matrix(iterator(range(1,1000)):map(function()return rnd:randNorm(0.0,1.0)end):table())
+local errors = stats.dist.normal():sample(rnd,1000)
 
 local boot_result = px.boot{
   size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
