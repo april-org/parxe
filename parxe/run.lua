@@ -28,7 +28,9 @@ local future = require "parxe.future"
 
 local function run(func, ...)
   local engine = config.engine()
-  return engine:execute(func, ...)
+  local f = engine:execute(func, ...)
+  f:ready()
+  return f
 end
 
 return run
