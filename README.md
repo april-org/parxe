@@ -84,32 +84,6 @@ function and a variable list of arguments received by the function.
 > print(f2:get())
 2098176
 ```
-
-A bootstrapping function has been added to perform resampling over large
-computation clusters. This function is a replacement of `stats.boot()` function
-in APRIL-ANN, and it can be used as follows:
-
-```Lua
-> px = require "parxe"
-> rnd = random(567)
-> errors = stats.dist.normal():sample(rnd,1000)
-> boot_result = px.boot{
-  size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
-  statistic = function(sample)
-    local s = errors:index(1, sample)
-    local var,mean = stats.var(s)
-    return mean,var
-  end
-}
-> boot_result = boot_result:index(1, boot_result:select(2,1):order())
-> a,b = stats.boot.ci(boot_result, 0.95)
-> print(a,b)
--0.073265952430665	0.051443199906498
-> m,p0,pn = stats.boot.percentile(boot_result, { 0.5, 0.0, 1.0 })
-> print(m,p0,pn)
--0.012237208895385	-0.11794531345367	0.09270916134119
-```
-
 You can use `px.future.all()` which receives an array of futures to wait several
 futures at the same time. Similarly, you can use `px.config.engine():wait()`.
 
@@ -154,6 +128,31 @@ as in:
 > px.config.engine():wait()
 > print(f3:get())
 1311498
+```
+
+Finally, a bootstrapping function has been added to perform resampling over
+large computation clusters. This function is a replacement of `stats.boot()`
+function in APRIL-ANN, and it can be used as follows:
+
+```Lua
+> px = require "parxe"
+> rnd = random(567)
+> errors = stats.dist.normal():sample(rnd,1000)
+> boot_result = px.boot{
+  size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
+  statistic = function(sample)
+    local s = errors:index(1, sample)
+    local var,mean = stats.var(s)
+    return mean,var
+  end
+}
+> boot_result = boot_result:index(1, boot_result:select(2,1):order())
+> a,b = stats.boot.ci(boot_result, 0.95)
+> print(a,b)
+-0.073265952430665	0.051443199906498
+> m,p0,pn = stats.boot.percentile(boot_result, { 0.5, 0.0, 1.0 })
+> print(m,p0,pn)
+-0.012237208895385	-0.11794531345367	0.09270916134119
 ```
 
 ## Engines
