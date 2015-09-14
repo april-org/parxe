@@ -84,3 +84,19 @@ local f2 = px.run(function() return matrix(2048):linspace():sum() end)
 local f3 = px.future.conditioned(function(f1,f2,x) return (f1+f2+x)/2 end,
                                  f1, f2, 20)
 print(f3:get())
+
+local rnd = random(567)
+local errors = matrix(iterator(range(1,1000)):map(function()return rnd:randNorm(0.0,1.0)end):table())
+
+local boot_result = px.boot{
+  size=errors:size(), R=1000, seed=1234, verbose=true, k=2,
+  statistic = function(sample)
+    local s = errors:index(1, sample)
+    local var,mean = stats.var(s)
+    return mean,var
+  end
+}
+local boot_result = boot_result:index(1, boot_result:select(2,1):order())
+local a,b = stats.boot.ci(boot_result, 0.95)
+local m,p0,pn = stats.boot.percentile(boot_result, { 0.5, 0.0, 1.0 })
+print(a,b,m,p0,pn)

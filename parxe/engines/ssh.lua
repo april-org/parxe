@@ -191,8 +191,7 @@ function ssh:destructor()
 end
 
 -- configures a future object to perform the given operation func(...), assigns
--- the future object a task_id and keeps it in pending_futures[jobid], being
--- jobid the SSH jobid as returned by execute_qsub() function
+-- the future object a task_id and keeps it in pending_futures[task_id]
 function ssh_methods:execute(func, ...)
   assert(num_remote_cores>0,
          "At least one machine with one core is needed, configure the engine by using function px.config.engine():add_machine(login,num_cores)")
@@ -218,7 +217,7 @@ function ssh_methods:wait()
   parallel_engine_wait_method(pending_futures)
 end
 
--- no limit due to SSH
+-- limited to the given number of remote machines
 function ssh_methods:get_max_tasks() return num_remote_cores end
 
 -- configure SSH resources

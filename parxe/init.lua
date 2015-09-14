@@ -23,6 +23,7 @@ local parxe = {
   config    = require "parxe.config".init(),
   future    = require "parxe.future",
   -- parallel functions
+  boot      = require "parxe.boot",
   map       = require "parxe.map",
   reduce    = require "parxe.reduce",
   run       = require "parxe.run",
