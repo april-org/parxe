@@ -5,8 +5,10 @@ PARalel eXecution Engine (PARXE) for [APRIL-ANN](https://github.com/pakozm/april
 PARXE is an extension written in Lua for APRIL-ANN and similar tools (it can be
 adapted to work with [Torch](http://torch.ch/), we hope to develop this
 adaptation layer in the future). PARXE implements functions like `map` and
-`reduce` over Lua objects (see below *which* objects are available) and runs the
-process automatically in a parallel environment. For instance:
+`reduce` over Lua *iterable objects* and runs the process automatically in a
+parallel environment. An iterable object is such an object implementing `__len`
+and `__index` metamethods, that is, operator `#` and operator `[i]` with `i` a
+positional index are valid. For instance:
 
 ```Lua
 > px = require "parxe"
@@ -17,7 +19,19 @@ process automatically in a parallel environment. For instance:
 ```
 
 Previous code maps a table into a new table doubling every value in original
-table. PARXE functions return an object of class `future`, so this objects
+table. As an exception, PARXE accepts *numbers* as iterable objects, being it an
+implicit array of sequential numbers. Therefore, the following code is equivalent to
+previous one:
+
+```Lua
+> px = require "parxe"
+> f  = px.map(function(x) return 2*x end, 6) -- map returns future
+> t  = f:get() -- capture future value (waits until termination)
+> print(table.concat(t, " "))
+2 4 6 8 10 12
+```
+
+PARXE functions return an object of class `future`, so this objects
 are not Lua values, but they will acquire the value in the *future*. To access
 the value you need to call `f:get()` method, waiting the necessary time until
 the value is ready and it can be safely returned to Lua.
