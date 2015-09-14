@@ -52,6 +52,23 @@ Other reducers can be more complicated:
 528 1552 2576 3600 4624 5648 6672 7696
 ```
 
+Any reduce operation needs to receive the initial value as last argument. Notice
+that initial value can be `nil` but should be given **explicitely**. In case of
+given `nil` as last argument, the operation takes the first slice of the object
+as the initial value of the aggregation. This can be useful for certain reduce
+functions where you don't know the properties of the aggregation result (for
+instance, when reducing a matrix, the shape of the aggregated matrix can be
+unknown):
+
+```Lua
+> px = require "parxe"
+> f  = px.reduce.self_distributive(function(a,b) return a+b end,
+                                   {1,2,3,4,5,6}, nil)
+> x  = f:get()
+> print(x)
+21
+```
+
 Besides map and reduce, you can run any function into the parallel environment.
 This can be done by means of `px.run()` function, whose arguments are a
 function and a variable list of arguments received by the function.

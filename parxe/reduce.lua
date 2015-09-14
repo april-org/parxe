@@ -38,7 +38,13 @@ local take_slice     = common.take_slice
 local px_slice_reduce = function(reduce_func, slice_object, ...)
   local arg = table.pack(...)
   local agg = util.clone( table.remove(arg) )
-  for i=1,#slice_object do
+  local first = 1
+  if not agg then
+    assert(#slice_object > 0, "Found a zero-length object, unable to reduce")
+    first=2
+    agg = slice_object[1]
+  end
+  for i=first,#slice_object do
     agg = reduce_func(agg, slice_object[i], table.unpack(arg))
   end
   return agg
@@ -47,7 +53,7 @@ end
 -- object needs should be a number or an iterable using # and [] operators
 local function px_reduce(reduce_func, object, ...)
   local arg = table.pack(...)
-  assert(arg.n > 0, "Needs an init value as last argument")
+  assert(arg.n > 0, "Needs an init value as last argument (which can be nil but should explicitly be given)")
   if class.is_a(object, future) then
     return future.conditioned(bind(px_slice_reduce, reduce_func), object, ...)
   else

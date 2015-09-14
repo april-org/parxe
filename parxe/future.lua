@@ -279,6 +279,7 @@ function future.all(tbl)
   f.get_stdout = all_get_stdout
   f.get_stderr = all_get_stderr
   f.data = tbl
+  f:ready()
   return f
 end
 
@@ -314,6 +315,7 @@ function future.conditioned(func, ...)
     if class.is_a(v,future) then table.insert(f_tbl,v) end
   end
   f.data = future.all(f_tbl)
+  f:ready()
   return f
 end
 
