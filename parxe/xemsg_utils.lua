@@ -23,13 +23,13 @@ local config = require "parxe.config"
 local xe     = require "xemsg"
 
 local function deserialize(s)
-  local str = assert( xe.recv(s) )
+  local str = assert( s:recv() )
   return util.deserialize( str )
 end
 
 local function serialize(data, s)
   local str = util.serialize( data )
-  assert( (assert( xe.send(s,str) )) == #str )
+  assert( (assert( s:send(str) )) == #str )
 end
 
 return {

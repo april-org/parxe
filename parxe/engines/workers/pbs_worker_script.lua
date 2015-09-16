@@ -31,9 +31,9 @@ local TIMEOUT  = 1800000 -- 30 minutes in milliseconds
 print("# JOBID: ", JOBID)
 -- socket creation and connection
 local client = assert( xe.socket(xe.NN_REQ) )
-assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
-assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
-local endpoint = assert( xe.connect(client, "tcp://%s:%d"%{SERVER, PORT}) )
+assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
+assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
+local endpoint = assert( client:connect("tcp://%s:%d"%{SERVER, PORT}) )
 -- request a new job
 serialize({ jobid=JOBID, hash=HASH, host=HOSTNAME, request=true }, client)
 -- response with task data
@@ -48,6 +48,4 @@ if not ok then err,result=result,{} end
 serialize({ jobid=JOBID, id=id, result=result,
             err=err, hash=HASH, reply=true }, client)
 assert( deserialize(client) ) -- ASK
-xe.shutdown(client, endpoint)
-xe.close(client)
-xe.term()
+client:shutdown(endpoint)

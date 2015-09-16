@@ -28,9 +28,9 @@ function RUN_WORKER(URI)
   print("# URI: ", URI)
   -- socket creation and connection
   local client = assert( xe.socket(xe.NN_REQ) )
-  assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
-  assert( xe.setsockopt(client, xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
-  local endpoint = assert( xe.connect(client, URI) )
+  assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
+  assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
+  local endpoint = assert( client:connect(URI) )
   -- request a new job
   serialize({ pid=PID, request=true }, client)
   -- response with task data
@@ -45,7 +45,5 @@ function RUN_WORKER(URI)
   -- request returning the task result
   serialize({ pid=PID, id=id, result=result, err=err, reply=true }, client)
   assert( deserialize(client) ) -- ASK
-  xe.shutdown(client, endpoint)
-  xe.close(client)
-  xe.term()
+  client:shutdown(endpoint)
 end

@@ -66,7 +66,7 @@ local server,endpoint
 local function init()
   if not server then
     server = assert( xe.socket(xe.NN_REP) )
-    endpoint = assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
+    endpoint = assert( server:bind("tcp://*:%d"%{resources.port}) )
     poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
   end
 end
@@ -184,8 +184,8 @@ function ssh:constructor()
 end
 
 function ssh:destructor()
-  xe.shutdown(server, endpoint)
-  xe.close(server)
+  server:shutdown(endpoint)
+  server:close()
   xe.term()
   os.remove(TMPNAME)
 end

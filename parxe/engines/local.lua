@@ -58,7 +58,7 @@ local server,endpoint
 local function init(force)
   if not server or force then
     server = assert( xe.socket(xe.NN_REP) )
-    endpoint = assert( xe.bind(server, URI) )
+    endpoint = assert( server:bind(URI) )
     -- Used in xe.poll() function.
     poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
   end
@@ -178,8 +178,8 @@ end
 
 function local_engine:destructor()
   if server then
-    xe.shutdown(server, endpoint)
-    xe.close(server)
+    server:shutdown(endpoint)
+    server:close()
     xe.term()
     util.wait()
   end

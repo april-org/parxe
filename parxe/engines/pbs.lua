@@ -64,7 +64,7 @@ local server,endpoint
 local function init(port)
   if not server or port then
     server = assert( xe.socket(xe.NN_REP) )
-    endpoint = assert( xe.bind(server, "tcp://*:%d"%{resources.port}) )
+    endpoint = assert( server:bind("tcp://*:%d"%{resources.port}) )
     poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
   end
 end
@@ -183,8 +183,8 @@ end
 
 function pbs:destructor()
   if server then
-    xe.shutdown(server, endpoint)
-    xe.close(server)
+    server:shutdown(endpoint)
+    server:close()
     xe.term()
   end
   os.remove(TMPNAME)
