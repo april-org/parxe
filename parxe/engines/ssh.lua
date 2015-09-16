@@ -184,9 +184,10 @@ function ssh:constructor()
 end
 
 function ssh:destructor()
-  server:shutdown(endpoint)
-  server:close()
-  xe.term()
+  if server then
+    server:shutdown(endpoint)
+    server:close()
+  end
   os.remove(TMPNAME)
 end
 

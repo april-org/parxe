@@ -180,7 +180,6 @@ function local_engine:destructor()
   if server then
     server:shutdown(endpoint)
     server:close()
-    xe.term()
     util.wait()
   end
   os.remove(TMPNAME)

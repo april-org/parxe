@@ -185,7 +185,6 @@ function pbs:destructor()
   if server then
     server:shutdown(endpoint)
     server:close()
-    xe.term()
   end
   os.remove(TMPNAME)
 end
