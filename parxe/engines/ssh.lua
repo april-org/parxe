@@ -82,6 +82,7 @@ function ssh_methods:check_asserts(cmd)
 end
 
 function ssh_methods:acceptting_tasks()
+  assert(num_remote_cores>0, "SHH engine requires at least one core")
   return #idle_machines > 0
 end
 

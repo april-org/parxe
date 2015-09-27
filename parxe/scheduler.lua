@@ -60,6 +60,10 @@ local function process_reply(r)
   pending_futures[r.id] = nil
   local task = f.task
   f.task     = nil
+  f.server   = nil
+  f.tmpname  = nil
+  f.task_id  = nil
+  f.time     = nil
   f._result_ = r.result or {false}
   f._err_    = r.err
   assert(f.task_id == r.id)
