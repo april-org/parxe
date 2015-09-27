@@ -81,7 +81,7 @@ end
 function local_methods:execute(task, stdout, stderr)
   -- local which,pid = util.split_process(2)
   -- if not pid then
-  local file = assert(arg[-1], "Unable to locate executable at arg[-1]")
+  local file = (arg or {[-1]="april-ann"})[-1]
   local cmd = "nohup %s -l %s -e \"RUN_WORKER('%s','%s',%d)\" > %s 2> %s & echo $!"%
     { file, "parxe.worker", URI, HASH, task.id,
       stdout, stderr }
