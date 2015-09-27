@@ -23,12 +23,11 @@
 -- both ends. Additionally, you can execute as many functions as you need, and
 -- them can be communicated by using message communication libraries.
 
-local config = require "parxe.config"
 local future = require "parxe.future"
+local sched  = require "parxe.scheduler"
 
 local function run(func, ...)
-  local engine = config.engine()
-  local f = engine:execute(func, ...)
+  local f = sched:enqueue(func, ...)
   f:ready()
   return f
 end

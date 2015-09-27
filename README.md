@@ -106,13 +106,13 @@ function and a variable list of arguments received by the function.
 2098176
 ```
 You can use `px.future.all()` which receives an array of futures to wait several
-futures at the same time. Similarly, you can use `px.config.engine():wait()`.
+futures at the same time. Similarly, you can use `px.scheduler:wait()`.
 
 ```Lua
 > px = require "parxe"
 > f1 = px.run(function() return matrix(1024):linspace():sum() end)
 > f2 = px.run(function() return matrix(2048):linspace():sum() end)
-> px.config.engine():wait()
+> px.scheduler:wait()
 > print(f1:get())
 524800
 > print(f2:get())
@@ -130,7 +130,7 @@ you can use the wrapper `px.future.value`:
 > f1 = px.run(function() return matrix(1024):linspace():sum() end)
 > f2 = px.run(function() return matrix(2048):linspace():sum() end)
 > f3 = f1 + f2 + fv(20)
-> px.config.engine():wait()
+> px.scheduler:wait()
 > print(f3:get())
 2622996
 ```
@@ -146,7 +146,7 @@ as in:
 > f1 = px.run(function() return matrix(1024):linspace():sum() end)
 > f2 = px.run(function() return matrix(2048):linspace():sum() end)
 > f3 = fc(function(f1,f2,a) return (f1+f2+a)/2 end, f1, f2, 20)
-> px.config.engine():wait()
+> px.scheduler:wait()
 > print(f3:get())
 1311498
 ```
@@ -198,6 +198,11 @@ The function `px.boot()` receives a table with this fields:
 
 - `random` an **optional** random number generator. Fields `seed`
   and `random` are forbidden together, only one can be indicated.
+
+## Scheduler
+
+The scheduler is responsible to queue tasks and deliver them to the selected
+engine.
 
 ## Engines
 
@@ -306,10 +311,9 @@ ssh:set_resource("appname", "$APRIL_EXEC")
 
 ## Dependencies
 
-The local and pbs engines needs the installation of
-[Xemsg!](https://github.com/pakozm/xemsg) a binding of
-[nanomsg](http://nanomsg.org/) for Lua. So, first you need to have installed
-libnanomsg-dev in your system and then execute:
+PARXE needs the installation of [Xemsg!](https://github.com/pakozm/xemsg), a
+binding of [nanomsg](http://nanomsg.org/) for Lua. So, first you need to have
+installed libnanomsg-dev in your system and then execute:
 
 ```
 $ git clone https://github.com/pakozm/xemsg.git

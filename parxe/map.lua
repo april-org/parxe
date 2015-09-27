@@ -24,9 +24,9 @@
 -- you can implement a map function over a whole matrix, not only a row, and it
 -- can be computationally more efficient.
 
-local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"
+local sched  = require "parxe.scheduler"
 
 local table_unpack   = table.unpack
 local print          = print
@@ -57,16 +57,15 @@ local function private_map(bunch, map_func, object, ...)
   if class.is_a(object, future) then
     return future.conditioned(bind(slice_map, map_func), object, ...)
   else
-    local engine   = config.engine()
     local futures  = {}
-    local N,M,K    = common.compute_task_split(object, engine)
+    local N,M,K    = common.compute_task_split(object)
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end
-      futures[i] = engine:execute(slice_map,
-                                  map_func,
-                                  take_slice(object, a, b),
-                                  ...)
+      futures[i] = sched:enqueue(slice_map,
+                                 map_func,
+                                 take_slice(object, a, b),
+                                 ...)
     end
     return future.all(futures)
   end

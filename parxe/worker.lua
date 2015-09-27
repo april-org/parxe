@@ -14,36 +14,38 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-]]
+--]]
 local px          = require "parxe"
 local common      = require "parxe.common"
 local xe          = require "xemsg"
 local xe_utils    = require "parxe.xemsg_utils"
 local deserialize = xe_utils.deserialize
 local serialize   = xe_utils.serialize
-local PID         = util.getpid()
-local TIMEOUT     = 1800000 -- 30 minutes in milliseconds
 --
-function RUN_WORKER(URI)
-  print("# URI: ", URI)
+local HOSTNAME = common.hostname()
+local TIMEOUT  = 1800000 -- 30 minutes in milliseconds
+--
+function RUN_WORKER(URL, HASH, ID)
+  print("# RUN_WORKER", URL, HASH, ID)
   -- socket creation and connection
   local client = assert( xe.socket(xe.NN_REQ) )
   assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_RCVTIMEO, TIMEOUT) )
   assert( client:setsockopt(xe.NN_SOL_SOCKET, xe.NN_SNDTIMEO, TIMEOUT) )
-  local endpoint = assert( client:connect(URI) )
+  local endpoint = assert( client:connect(URL) )
   -- request a new job
-  serialize({ pid=PID, request=true }, client)
+  serialize({ id=ID, hash=HASH, host=HOSTNAME, request=true }, client)
   -- response with task data
   local task = deserialize(client)
-  local func, args, id, wd = task.func, task.args, task.id, task.wd
-  print("# TASKID: ", task.id)
-  os.execute("cd " .. wd)
+  local func, args, id = task.func, task.args, task.id
+  assert(id == ID)
+  print("# TASKID: ", id)
   -- execute the task
   local ok,result = xpcall(func,debug.traceback,table.unpack(args))
   local err = nil
   if not ok then err,result=result,{} end
   -- request returning the task result
-  serialize({ pid=PID, id=id, result=result, err=err, reply=true }, client)
-  assert( deserialize(client) ) -- ASK
+  serialize({ id=id, result=result, err=err, hash=HASH, reply=true }, client)
+  assert( deserialize(client) )
   client:shutdown(endpoint)
+  client:close()
 end

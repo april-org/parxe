@@ -25,9 +25,9 @@
 -- distributive, commutative and idempotent. In this case, the reduce operation
 -- instead of returning a table of values, it returns a unique reduced value.
 
-local config = require "parxe.config"
 local future = require "parxe.future"
 local common = require "parxe.common"
+local sched  = require "parxe.scheduler"
 
 local table_unpack   = table.unpack
 local print          = print
@@ -76,17 +76,16 @@ local function px_reduce(self_distributive, reduce_func, object, ...)
   if class.is_a(object, future) then
     return future.conditioned(bind(px_slice_reduce, reduce_func), object, ...)
   else
-    local engine   = config.engine()
     local futures  = {}
-    local N,M,K    = common.compute_task_split(object, engine)
+    local N,M,K    = common.compute_task_split(object)
     local slice_reduce = self_distributive and px_slice_binary_reduce or px_slice_reduce
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end
-      futures[i] = engine:execute(slice_reduce,
-                                  reduce_func,
-                                  take_slice(object, a, b),
-                                  ...)
+      futures[i] = sched:enqueue(slice_reduce,
+                                 reduce_func,
+                                 take_slice(object, a, b),
+                                 ...)
     end
     return future.all(futures)
   end

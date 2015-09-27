@@ -43,10 +43,11 @@ class.extend_metamethod(range_object, "__ipairs",
 -- parallel task. The length K is the ceiling of the proportion N/M, so the
 -- caller needs to compute properly the length of the last task which can be
 -- less than K.
-local function compute_task_split(object, engine)
+local function compute_task_split(object)
   local config = require "parxe.config"
   local max_number_tasks = config.max_number_tasks()
   local min_task_len = config.min_task_len()
+  local engine = config.engine()
   local N = (type(object)=="number" and object) or #object
   local M = math.min(engine:get_max_tasks() or N, max_number_tasks)
   local K = math.max(math.ceil(N/M), min_task_len)
@@ -75,16 +76,6 @@ do
 end
 
 -- generic wait method, receives a dictionary of pending_futures and executes
--- wait in everyone until all are done
-local function parallel_engine_wait_method(pending_futures)
-  repeat
-    for id,f in pairs(pending_futures) do
-      f:wait()
-      pending_futures[id] = nil
-    end
-  until not next(pending_futures)
-end
-
 -- Given an iterable object, it returns its slice range [a,b]. If object is
 -- a number, it returns a range_object(a,b)
 local function take_slice(obj, a, b)
@@ -119,7 +110,6 @@ return {
   gettime = gettime,
   hostname = hostname,
   next_task_id = next_task_id,
-  parallel_engine_wait_method = parallel_engine_wait_method,
   range_object = range_object,
   take_slice = take_slice,
   user_conf = user_conf,

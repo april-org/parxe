@@ -17,13 +17,7 @@
 ]]
 local common   = require "parxe.common"
 local config   = require "parxe.config"
-local future   = require "parxe.future"
 local xe       = require "xemsg"
-local xe_utils = require "parxe.xemsg_utils"
-
-local parallel_engine_wait_method = common.parallel_engine_wait_method
-local serialize   = xe_utils.serialize
-local deserialize = xe_utils.deserialize
 
 ---------------------------------------------------------------------------
 -- TMPNAME allows to identify this server, allowing to execute several servers
@@ -42,14 +36,6 @@ local machines = {}
 local idle_machines = {}
 local num_remote_cores = 0
 
--- Used in xe.poll() function.
-local poll_fds = {}
-
--- A table with all the futures related with executed processes. The table is
--- indexed as a dictionary using task_id as keys.
-local pending_futures = {}
-local pending_tasks = {}
-
 -- Table with all allowed resources for SSH configuration. They can be setup
 -- by means of set_resource method in ssh engine object.
 local allowed_resources = { omp=true, appname=true, host=true }
@@ -61,123 +47,8 @@ local shell_lines = {}
 ---------------------------------------------------------------------------
 
 -- Forward declaration of server socket and binded endpoint identifier
-local server,endpoint
--- initializes the nanomsg SP socket for REQ/REP pattern
-local function init()
-  if not server then
-    server = assert( xe.socket(xe.NN_REP) )
-    endpoint = assert( server:bind("tcp://*:%d"%{resources.port}) )
-    poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
-  end
-end
+local server,endpoint,server_url,client_url
 
--- Executes ssh passing it the worker script and resources
--- configuration.
-local function execute_worker(machine_key, task)
-  local tmp = config.tmp()
-  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task.id,os.date("%Y%m%d%H%M%S")}
-  local f = pending_futures[task.id]
-  f._stdout_ = tmpname..".OU"
-  f._stderr_ = tmpname..".ER"
-  f.machine  = machine_key
-  f.time     = common.gettime()
-  local command = {
-    "source ~/.bashrc",
-    "cd "..task.wd,
-    "export PARXE_SERVER="..resources.host,
-    "export PARXE_SERVER_PORT="..resources.port,
-    "export PARXE_HASH="..HASH,
-    "export PARXE_TASKID="..task.id,
-    "export OMP_NUM_THREADS="..resources.omp,
-  }
-  for _,v in pairs(shell_lines) do table.insert(command, v) end
-  table.insert(command,
-               "if [[ -z %s ]]; then echo Impossible to expand appname; exit -1; fi"%{resources.appname})
-  table.insert(command,
-               'nohup %s -l parxe.engines.workers.ssh_worker_script -e "" > %s 2> %s < /dev/null &'%
-                 { resources.appname, f._stdout_, f._stderr_, })
-  local s = table.concat{ "ssh ", machines[machine_key],
-                          " '",
-                          table.concat(command, ";"),
-                          "'"}
-  assert( os.execute(s) )
-  -- return pid ????? Is it possible to control the SSH command?
-end
-
------------------------------ check worker helpers ---------------------------
-
--- given a future object, serializes its associated task by means of server
--- SP socket
-local function send_task(f)
-  local task = f.task
-  serialize(task, server)
-  f.task    = nil
-  f.host    = machines[f.machine]:match("^([^@]+)$")
-  f._state_ = future.RUNNING_STATE
-end
-
--- given a worker reply, returns a true to the worker and process the result
--- modifying its corresponding future object
-local function process_reply(r)
-  serialize(true, server)
-  local f = pending_futures[r.id]
-  pending_futures[r.id] = nil
-  f._result_ = r.result or {false}
-  f._err_    = r.err
-  table.insert(idle_machines, f.machine)
-  assert(f.jobid == r.jobid)
-  assert(f.task_id == r.id)
-end
-
--- reads a message request from socket s and executes the corresponding response
-local function process_message(s, revents)
-  assert(revents == xe.NN_POLLIN)
-  if revents == xe.NN_POLLIN then
-    local cmd = deserialize(s)
-    assert(cmd.hash == HASH,
-           "Warning: unknown hash identifier, check that every server has a different port\n")
-    if cmd.request then
-      -- task request, send a reply with the task
-      send_task(pending_futures[cmd.id])
-    elseif cmd.reply then
-      -- task reply, read task result and send ack
-      process_reply(cmd)
-      if cmd.err then fprintf(io.stderr, "ERROR IN TASK %d: %s\n", cmd.id, cmd.err) end
-      return true
-    else
-      error("Incorrect command")
-    end
-  end
-end
-
------------------------- check worker function -------------------------------
-
--- This function is the main one for future objects produced by local engine.
--- This function is responsible of execute workers associated with pending
--- tasks, look-up for new incoming messages and dispatch its response by using
--- process_message function.
-local function check_worker()
-  while #pending_tasks > 0 and #idle_machines > 0 do
-    execute_worker(table.remove(idle_machines, 1),
-                   table.remove(pending_tasks, 1))
-  end
-  repeat
-    local n = assert( xe.poll(poll_fds) )
-    if n > 0 then
-      for i,r in ipairs(poll_fds) do
-        if r.events == r.revents then
-          process_message(r.fd, r.revents)
-          r.revents = nil
-        end
-      end
-    end
-  until n == 0
-  collectgarbage("collect")
-end
-
----------------------------------------------------------------------------
-
--- The ssh engine class, exported as result of this module.
 local ssh,ssh_methods = class("parxe.engine.ssh")
 
 function ssh:constructor()
@@ -191,34 +62,60 @@ function ssh:destructor()
   os.remove(TMPNAME)
 end
 
--- configures a future object to perform the given operation func(...), assigns
--- the future object a task_id and keeps it in pending_futures[task_id]
-function ssh_methods:execute(func, ...)
-  assert(num_remote_cores>0,
-         "At least one machine with one core is needed, configure the engine by using function px.config.engine():add_machine(login,num_cores)")
-  init()
-  local args    = table.pack(...)
-  local task_id = common.next_task_id()
+function ssh_methods:init()
+  if not server then
+    server_url = "tcp://*:%d"%{resources.port}
+    client_url = "tcp://%s:%d"%{resources.host,resources.port}
+    server = assert( xe.socket(xe.NN_REP) )
+    endpoint = assert( server:bind(server_url) )
+  end
+  return server
+end
+
+function ssh_methods:abort(task)
+  error("Not implemented")
+end
+
+function ssh_methods:check_asserts(cmd)
+  assert(cmd.hash == HASH,
+         "Warning: unknown hash identifier, check that every server has a different port\n")
+end
+
+function ssh_methods:acceptting_tasks()
+  return #idle_machines > 0
+end
+
+-- Executes ssh passing it the worker script and resources
+-- configuration.
+function ssh_methods:execute(task, stdout, stderr)
+  local machine_key = assert( table.remove(idle_machines, 1) )
   local tmp = config.tmp()
-  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task_id,os.date("%Y%m%d%H%M%S")}
-  local f = future(check_worker)
-  f._stdout_  = tmpname..".OU"
-  f._stderr_  = tmpname..".ER"
-  f.tmpname   = tmpname
-  f.task_id   = task_id
-  pending_futures[task_id] = f
-  local task = { id=task_id, func=func, args=args, wd=config.wd() }
-  f.task = task
-  table.insert(pending_tasks, task)
-  return f
+  local tmpname = "%s/PX_%s_%06d_%s"%{tmp,HASH,task.id,os.date("%Y%m%d%H%M%S")}
+  task.machine = machine_key
+  local command = {
+    "source ~/.bashrc",
+    "cd "..task.wd,
+    "export OMP_NUM_THREADS="..resources.omp,
+  }
+  for _,v in pairs(shell_lines) do table.insert(command, v) end
+  table.insert(command,
+               "if [[ -z %s ]]; then echo Impossible to expand appname; exit -1; fi"%{resources.appname})
+  table.insert(command,
+               'nohup %s -l parxe.worker -e "RUN_WORKER([[%s]],[[%s]],%d)" > %s 2> %s < /dev/null &'%
+                 { resources.appname, client_url, HASH, task.id, stdout, stderr, })
+  local s = table.concat{ "ssh ", machines[machine_key],
+                          " '",
+                          table.concat(command, ";"),
+                          "'" }
+  assert( os.execute(s) )
+  -- return pid ????? Is it possible to control the SSH command?
 end
 
--- waits until all futures are ready
-function ssh_methods:wait()
-  parallel_engine_wait_method(pending_futures)
+function ssh_methods:finished(task)
+  table.insert(idle_machines, task.machine)
+  task.machine = nil
 end
 
--- limited to the given number of remote machines
 function ssh_methods:get_max_tasks() return num_remote_cores end
 
 -- configure SSH resources
