@@ -211,8 +211,10 @@ using the function `px.config.set_engine(ENGINE)` given in `ENGINE` a Lua string
 with the name of the particular engine you want to use. Currently there are
 three engines available:
 
-- "seq" is not a parallel engine, it just executes every command as soon as they
-  are requested.
+- "seq" is not a parallel engine, it just executes every command as
+  soon as they are requested. It uses
+  [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg INPROC
+  transport to be compatible with parallel engines API.
 
 - "local" it uses `nohup` to execute as many workers as cores has the local
   machine. It uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg IPC
