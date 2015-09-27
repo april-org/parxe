@@ -55,6 +55,7 @@ end
 -- modifying its corresponding future object
 local function process_reply(r)
   local f = pending_futures[r.id]
+  assert(f.task_id == r.id, "Unexpected error")
   local server = f.server
   serialize(true, server)
   pending_futures[r.id] = nil
@@ -66,7 +67,6 @@ local function process_reply(r)
   f.time     = nil
   f._result_ = r.result or {false}
   f._err_    = r.err
-  assert(f.task_id == r.id)
   return task
 end
 
