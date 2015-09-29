@@ -228,7 +228,9 @@ three engines available:
   hosts. It uses [Xemsg!](https://github.com/pakozm/xemsg) with nanomsg TCP
   transport to communication between processes. This engine needs at least
   one machine with one core to work, so you need to execute at least once
-  `px.config.engine():add_machine(login,num_cores)`.
+  `px.config.engine():add_machine(login[,num_cores])`. This function receives
+  an optional number of cores, if not given it retrieves the available number
+  of cores from the remote machine.
 
 ## Default configuration
 

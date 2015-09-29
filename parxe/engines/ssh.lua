@@ -135,12 +135,20 @@ end
 
 -- adds a new machine given the login@host credential and the number of cores
 function ssh_methods:add_machine(login_host, num_cores)
-  for i=1,num_cores or 1 do
+  -- check ssh connectivity
+  local f = assert( io.popen("ssh -n %s 'getconf _NPROCESSORS_ONLN'"%{login_host}),
+                    "Unable to connect" )
+  local n = assert( tonumber( f:read("*l") ),
+                    "Unable to retrieve number of cores" )
+  f:close()
+  num_cores = num_cores or n
+  for i=1,num_cores do
     local machine_key = login_host.."_"..i
-    assert(not machines[machine_key])
-    machines[machine_key] = login_host
-    table.insert(idle_machines, machine_key)
-    num_remote_cores = num_remote_cores + 1
+    if not machines[machine_key] then
+      machines[machine_key] = login_host
+      table.insert(idle_machines, machine_key)
+      num_remote_cores = num_remote_cores + 1
+    end
   end
 end
 
