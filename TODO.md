@@ -16,3 +16,6 @@
 - In qsub engine, cancel all pending/executing jobs in PBS when exiting the
   program.
 
+- Keep a checkpoint list at user folder which can be useful to recover from
+  failures. To protect this checkpoint list the file will be keeped at
+  ~/.parxe/checkpoints instead of tmp folder.
