@@ -248,7 +248,9 @@ config.set_engine("pbs")
 Other things which can be configured are:
 
 - `config.set_clean_tmp_at_exit(boolean)` indicates if remove all stdout and
-  stderr files produced by task execution.
+  stderr files produced by task execution. A list to track all created files
+  will be polluted during execution of PARXE. The files will be removed when
+  exiting from Lua execution, in the scheduler destructor.
 
 - `config.set_engine(ENGINE)` receives the name of the engine, a string with
   any of these values: "seq", "local", "pbs", "ssh".

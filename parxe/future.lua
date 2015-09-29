@@ -45,11 +45,10 @@ local future,future_methods = class("parxe.future")
 
 -- useful functions and variables
 local gettime = common.gettime
-local function elapsed_time(t0_sec) return gettime() - t0_sec end
+local elapsed_time = common.elapsed_time
+local wait_exists = common.wait_exists
 local function aborted_function() error("aborted future execution") end
 local function dummy_function() end
-local NFS_TIMEOUT   = 60 -- seconds
-local NFS_WAIT_STEP =  1 -- seconds
 
 -------------------------------------------------------------------------
 
@@ -64,33 +63,6 @@ end)
 function future:constructor(do_work)
   self._do_work_ = do_work or dummy_function
   self._state_ = PENDING_STATE
-end
-
--- implement wait until filename is synchronized by NFS or similar shared
--- filesystems
-local TIMEDOUT = false
-local function wait_exists(filename)
-  local t0 = gettime()
-  while not io.open(filename) and not TIMEDOUT do
-    fprintf(io.stderr,
-            "# Waiting disk sync: %.0f s more, %.0f s elapsed \n",
-            NFS_WAIT_STEP, elapsed_time(t0))
-    util.sleep(NFS_WAIT_STEP)
-    if elapsed_time(t0) > NFS_TIMEOUT then
-      fprintf(io.stderr, "# Wait timedout!\n")
-      TIMEDOUT=true
-      break
-    end
-    NFS_WAIT_STEP = NFS_WAIT_STEP + 1
-  end
-  return not TIMEDOUT -- true in case of success or false in case of timeout
-end
-
-function future:destructor()
-  if config.clean_tmp_at_exit() then
-    if self._stdout_ then wait_exists(self._stdout_) os.remove(self._stdout_) end
-    if self._stderr_ then wait_exists(self._stderr_) os.remove(self._stderr_) end
-  end
 end
 
 -- waits until timeout (or infinity if not given) and returns true in case data
@@ -132,7 +104,7 @@ function future_methods:get_stderr()
   if not self._stderr_ then
     err = self._err_
   else
-    if wait_exists(self._stderr_) then
+    if wait_exists(self._stderr_, true) then
       local f = io.open(self._stderr_)
       err = f:read("*a")
       f:close()
@@ -146,7 +118,7 @@ function future_methods:get_stdout()
   if not self._result_ then self:wait() end
   if not self._stdout_ then return "" end
   local out
-  if wait_exists(self._stdout_) then
+  if wait_exists(self._stdout_, true) then
     local f = io.open(self._stdout_)
     out = f:read("*a")
     f:close()

@@ -61,6 +61,9 @@ local function gettime()
   return s + us/1.0e6
 end
 
+-- returns the elapsed time from a given starting point
+local function elapsed_time(t0_sec) return gettime() - t0_sec end
+
 -- returns hostname using the same OS command
 local function hostname()
   local f = assert(io.popen("hostname"), "hostname command not found")
@@ -105,12 +108,39 @@ local function user_conf(filename, ...)
   if f then f:close() loadfile(CONF)(...) end
 end
 
+-- implement wait until filename is synchronized by NFS or similar shared
+-- filesystems
+local NFS_TIMEOUT   = 60 -- seconds
+local NFS_WAIT_STEP =  1 -- seconds
+local TIMEDOUT      = false
+local function wait_exists(filename, restore_timeout)
+  local t0 = gettime()
+  while not io.open(filename) and not TIMEDOUT do
+    fprintf(io.stderr,
+            "# Waiting disk sync: %.0f s more, %.0f s elapsed \n",
+            NFS_WAIT_STEP, elapsed_time(t0))
+    util.sleep(NFS_WAIT_STEP)
+    if elapsed_time(t0) > NFS_TIMEOUT then
+      fprintf(io.stderr, "# Wait timedout!\n")
+      TIMEDOUT=true
+      break
+    end
+    NFS_WAIT_STEP = NFS_WAIT_STEP + 1
+  end
+  -- true in case of success or false in case of timeout
+  local result = not TIMEDOUT
+  if restore_timeout then TIMEDOUT = false end
+  return result
+end
+
 return {
   compute_task_split = compute_task_split,
+  elapsed_time = elapsed_time,
   gettime = gettime,
   hostname = hostname,
   next_task_id = next_task_id,
   range_object = range_object,
   take_slice = take_slice,
   user_conf = user_conf,
+  wait_exists = wait_exists,
 }

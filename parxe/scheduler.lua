@@ -34,6 +34,9 @@ local HASH     = TMPNAME:match("^.*lua_(.*)$")
 local HOSTNAME = common.hostname()
 ---------------------------------------------------------------------------
 
+-- Used at clear_tmp() function.
+local pending_tmp_files = {}
+
 -- Used in xe.poll() function.
 local poll_fds = {}
 
@@ -41,6 +44,16 @@ local poll_fds = {}
 -- indexed as a dictionary using task_ids as keys.
 local pending_futures = {}
 local pending_tasks = {}
+
+-- clears the files created at tmp folder
+function clean_tmp()
+  local wait_exists = common.wait_exists
+  local remove = os.remove
+  for _,filename in ipairs(pending_tmp_files) do
+    wait_exists(filename)
+    remove(filename)
+  end
+end
 
 ----------------------------- check worker helpers ---------------------------
 
@@ -131,6 +144,10 @@ local function init(self)
   return engine,server
 end
 
+function sched:destructor()
+  if config.clean_tmp_at_exit() then clean_tmp() end
+end
+
 function sched_methods:enqueue(func, ...)
   local engine,server = init(self)
   local args    = table.pack(...)
@@ -147,6 +164,8 @@ function sched_methods:enqueue(func, ...)
   f.time      = common.gettime()
   f.server    = server
   pending_futures[task_id] = f
+  table.insert(pending_tmp_files, f._stdout_)
+  table.insert(pending_tmp_files, f._stderr_)
   if engine:acceptting_tasks() then
     engine:execute(task, f._stdout_, f._stderr_)
   else
