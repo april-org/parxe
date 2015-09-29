@@ -16,6 +16,10 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ]]
 require "aprilann"
+
+local HOME = os.getenv("HOME")
+if HOME then os.execute("mkdir -p %s/.parxe/checkpoints 2> /dev/null"%{HOME}) end
+
 local parxe = {
   _NAME     = "parxe",
   _VERSION  = "0.1",
