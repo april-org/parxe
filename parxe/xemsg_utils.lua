@@ -23,21 +23,29 @@ local config = require "parxe.config"
 local xe     = require "xemsg"
 
 local blacklist = table.invert{
+  "coroutine",
   "debug",
   "get_lua_properties_table",
   "io",
+  "dofile",
+  "_G",
+  "getfenv",
   "libpng",
   "load",
   "loadfile",
   "loadstring",
+  "math",
   "module",
+  "newproxy",
   "os",
   "package",
   "parallel_foreach",
   "require",
-  "require",
+  "setfenv",
   "set_lua_properties_table",
   "signal",
+  "string",
+  "table",
   "util",
 }
 
