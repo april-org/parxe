@@ -88,7 +88,7 @@ local function process_message(s, revents)
   assert(revents == xe.NN_POLLIN)
   local engine = config.engine()
   if revents == xe.NN_POLLIN then
-    local cmd = deserialize(s)
+    local cmd = deserialize(s, true)
     engine:check_asserts(cmd)
     if cmd.request then
       -- task request, send a reply with the task

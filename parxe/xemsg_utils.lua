@@ -22,9 +22,36 @@
 local config = require "parxe.config"
 local xe     = require "xemsg"
 
-local function deserialize(s)
+local blacklist = table.invert{
+  "debug",
+  "get_lua_properties_table",
+  "io",
+  "libpng",
+  "load",
+  "loadfile",
+  "loadstring",
+  "module",
+  "os",
+  "package",
+  "parallel_foreach",
+  "require",
+  "require",
+  "set_lua_properties_table",
+  "signal",
+  "util",
+}
+
+local function deserialize(s, safe)
   local str = assert( s:recv() )
-  return util.deserialize( str )
+  local env = _G
+  if safe then
+    env = {}
+    for k,v in pairs(_G) do
+      if not blacklist[k] then env[k] = v end
+    end
+  end
+  local loader = assert( load(str, nil, nil, env) )
+  return loader()
 end
 
 local function serialize(data, s)
