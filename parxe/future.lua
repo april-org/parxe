@@ -272,6 +272,13 @@ local conditioned_do_work = function(self)
     local data = self.func( table.unpack(self.args) )
     if not class.is_a(data, future) then
       self._result_ = data
+    else
+      for k,v in pairs(self) do self[k] = nil end
+      future.constructor(self, all_do_work)
+      self.get_stdout = all_get_stdout
+      self.get_stderr = all_get_stderr
+      self.data = { data }
+      self:ready()
     end
   end
 end

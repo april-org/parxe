@@ -40,7 +40,7 @@ print(matrix.join(1,f4:get()))
 print(matrix.join(1,f5:get()))
 
 local f = px.reduce(function(a,x) return a+x end, iterator.range(1024):table(), 0)
-local f = px.reduce(math.add, f, 0)
+local f = px.reduce.self_distributive(lambda'|a,b|a+b', f)
 local r = f:get()
 print(r)
 

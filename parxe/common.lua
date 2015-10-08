@@ -37,6 +37,16 @@ class.extend_metamethod(range_object, "__ipairs",
 
 -----------------------------------------------------------------------------
 
+-- returns true in case any of the given list of objects is a future
+local function any_future(...)
+  local future = require "parxe.future"
+  for i=1,select('#',...) do
+    local obj = select(i,...)
+    if class.is_a(obj, future) then return true end
+  end
+  return false
+end
+
 -- Given an object (which allow operators # and []), and a parallel engine, this
 -- function computes and returns the length N of the object, the number M of
 -- parallel tasks to be executed and the length K of every object slice for every
@@ -134,6 +144,7 @@ local function wait_exists(filename, restore_timeout)
 end
 
 return {
+  any_future = any_future,
   compute_task_split = compute_task_split,
   elapsed_time = elapsed_time,
   gettime = gettime,
