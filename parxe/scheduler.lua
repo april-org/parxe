@@ -184,6 +184,10 @@ function sched_methods:wait()
   until not next(pending_futures)
 end
 
+function sched_methods:any_pending()
+  return #pending_tasks>0 or (next(pending_futures))~=nil
+end
+
 ----------------------------------------------------------------------------
 
 local singleton = sched()
