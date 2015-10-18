@@ -31,6 +31,7 @@ local sched  = require "parxe.scheduler"
 local table_unpack   = table.unpack
 local print          = print
 
+local any_future     = common.any_future
 local range_object   = common.range_object
 local take_slice     = common.take_slice
 
@@ -53,12 +54,12 @@ end
 
 -- object needs should be a number or an iterable using # and [] operators
 local function private_map(bunch, map_func, object, ...)
-  local slice_map = bunch and px_map_bunch or px_slice_map
-  if class.is_a(object, future) then
-    return future.conditioned(bind(slice_map, map_func), object, ...)
+  if any_future(object, ...) then
+    return future.conditioned(bind(private_map, bunch, map_func), object, ...)
   else
-    local futures  = {}
-    local N,M,K    = common.compute_task_split(object)
+    local slice_map = bunch and px_map_bunch or px_slice_map
+    local futures   = {}
+    local N,M,K     = common.compute_task_split(object)
     for i=1,M do
       local a,b = math.min(N,(i-1)*K)+1,math.min(N,i*K)
       if b<a then break end

@@ -1,0 +1,3 @@
+[submodule "external/xemsg"]
+	path = external/xemsg
+	url = https://github.com/pakozm/xemsg.git
