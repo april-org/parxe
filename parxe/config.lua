@@ -50,7 +50,10 @@ api = {
   --
   clean_tmp_at_exit = function() return clean_tmp_at_exit end,
   engine = function()
-    engine = engine or require ("parxe.engines."..engine_string)
+    if not engine then
+      local mod = require ("parxe.engines."..engine_string)
+      engine = mod()
+    end
     return engine
   end,
   max_number_tasks = function() return max_number_tasks end,
@@ -62,7 +65,15 @@ api = {
   set_clean_tmp_at_exit = function(v) clean_tmp_at_exit = v end,
   set_engine = function(str)
     assert(type(str) == "string")
-    assert(not engine, "Unable to change the engine after any task execution")
+    if engine then
+      local sched = require "parxe.scheduler"
+      if sched:any_pending() then
+        fprintf(io.stderr, "Unable to change the engine during any task execution")
+        return
+      end
+      engine = nil
+      collectgarbage("collect")
+    end
     engine_string = str
   end,
   set_max_number_tasks = function(n) assert(type(n) == "number") max_number_tasks = n end,

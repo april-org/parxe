@@ -31,7 +31,6 @@ local deserialize = xe_utils.deserialize
 -- is used to  identify client connections in order to assert possible errors.
 local TMPNAME  = os.tmpname()
 local HASH     = TMPNAME:match("^.*lua_(.*)$")
-local HOSTNAME = common.hostname()
 ---------------------------------------------------------------------------
 
 -- Used at clear_tmp() function.
@@ -138,7 +137,7 @@ local sched,sched_methods = class("parxe.scheduler")
 local function init(self)
   local engine = config.engine()
   local server = engine:init()
-  if #poll_fds == 0 then
+  if #poll_fds == 0 or server ~= poll_fds[1].fd then
     poll_fds[1] = { fd = server, events = xe.NN_POLLIN }
   end
   return engine,server
@@ -146,6 +145,7 @@ end
 
 function sched:destructor()
   if config.clean_tmp_at_exit() then clean_tmp() end
+  os.remove(TMPNAME)
 end
 
 function sched_methods:enqueue(func, ...)
