@@ -71,6 +71,7 @@ api = {
         fprintf(io.stderr, "Unable to change the engine during any task execution")
         return
       end
+      engine:destroy()
       engine = nil
       collectgarbage("collect")
     end

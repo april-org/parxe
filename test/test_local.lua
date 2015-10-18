@@ -18,5 +18,3 @@
 local px = require "parxe"
 px.config.set_engine("local")
 dofile("test/generic_test.lua")
-px.config.set_engine("ssh")
-dofile("test/generic_test.lua")

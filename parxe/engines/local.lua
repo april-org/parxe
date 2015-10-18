@@ -53,7 +53,12 @@ function local_class:destructor()
     self.server:shutdown(self.endpoint)
     self.server:close()
   end
-  os.remove(self.TMPNAME)
+  if self.TMPNAME then os.remove(self.TMPNAME) end
+end
+
+function local_methods:destroy()
+  local_class.destructor(self)
+  for k,v in pairs(self) do self[k] = nil end
 end
 
 function local_methods:init()

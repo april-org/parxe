@@ -54,7 +54,12 @@ function seq:destructor()
     self.server:close()
     self.client:close()
   end
-  os.remove(self.TMPNAME)
+  if self.TMPNAME then os.remove(self.TMPNAME) end
+end
+
+function seq_methods:destroy()
+  seq.destructor(self)
+  for k,v in pairs(self) do self[k] = nil end
 end
 
 function seq_methods:init()
