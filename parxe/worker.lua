@@ -16,7 +16,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 --]]
 require "aprilann"
-local px          = require "parxe"
 local common      = require "parxe.common"
 local xe          = require "xemsg"
 local xe_utils    = require "parxe.xemsg_utils"
