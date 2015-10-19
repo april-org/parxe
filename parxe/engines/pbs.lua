@@ -21,7 +21,7 @@ local xe       = require "xemsg"
 
 -- Table with all allowed resources for PBS configuration. They can be setup
 -- by means of set_resource method in pbs engine object.
-allowed_resources = { mem=true, q=true, name=true, omp=true,
+allowed_resources = { mem=true, q=true, name=true, omp=true, port=true,
                       appname=true, host=true, properties = true }
 
 local pbs,pbs_methods = class("parxe.engine.pbs")

@@ -21,7 +21,7 @@ local xe       = require "xemsg"
 
 -- Table with all allowed resources for SSH configuration. They can be setup
 -- by means of set_resource method in ssh engine object.
-allowed_resources = { omp=true, appname=true, host=true }
+allowed_resources = { omp=true, appname=true, host=true, port=true }
 
 local ssh,ssh_methods = class("parxe.engine.ssh")
 
