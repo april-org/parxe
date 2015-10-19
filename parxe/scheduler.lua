@@ -31,6 +31,9 @@ local deserialize = xe_utils.deserialize
 -- is used to  identify client connections in order to assert possible errors.
 local TMPNAME  = os.tmpname()
 local HASH     = TMPNAME:match("^.*lua_(.*)$")
+local f = io.open(TMPNAME,"w")
+f:write("PARXE scheduler\n")
+f:close()
 ---------------------------------------------------------------------------
 
 -- Used at clear_tmp() function.

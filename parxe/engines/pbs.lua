@@ -35,6 +35,9 @@ function pbs:constructor()
   self.TMPNAME  = os.tmpname()
   self.HASH     = self.TMPNAME:match("^.*lua_(.*)$")
   self.HOSTNAME = common.hostname()
+  local f = io.open(self.TMPNAME,"w")
+  f:write("PARXE pbs engine\n")
+  f:close()
   ---------------------------------------------------------------------------
   
   -- Value of resources for PBS configuration.

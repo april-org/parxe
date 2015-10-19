@@ -32,6 +32,9 @@ function local_class:constructor()
   -- is used to  identify client connections in order to assert possible errors.
   self.TMPNAME  = os.tmpname()
   self.HASH     = self.TMPNAME:match("^.*lua_(.*)$")
+  local f = io.open(self.TMPNAME,"w")
+  f:write("PARXE local engine\n")
+  f:close()
   
   -- nanomsg URI connection, using IPC transport
   self.URI = "ipc://"..self.TMPNAME

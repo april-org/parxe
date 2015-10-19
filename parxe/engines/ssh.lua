@@ -34,6 +34,9 @@ function ssh:constructor()
   self.TMPNAME  = os.tmpname()
   self.HASH     = self.TMPNAME:match("^.*lua_(.*)$")
   self.HOSTNAME = common.hostname()
+  local f = io.open(self.TMPNAME,"w")
+  f:write("PARXE ssh engine\n")
+  f:close()
   ---------------------------------------------------------------------------
 
   -- List of available machines. If one machine has multiple cores, you should put
