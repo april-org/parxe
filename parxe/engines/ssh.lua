@@ -19,9 +19,20 @@ local common   = require "parxe.common"
 local config   = require "parxe.config"
 local xe       = require "xemsg"
 
+local HOSTNAME = common.hostname()
 -- Table with all allowed resources for SSH configuration. They can be setup
 -- by means of set_resource method in ssh engine object.
-allowed_resources = { omp=true, appname=true, host=true, port=true }
+local allowed_resources = { omp=true, appname=true, host=true, port=true }
+-- List of available machines. If one machine has multiple cores, you should put
+-- it several times in this list. By default the list is empty.
+local machines = {}
+-- Value of resources for SSH configuration.
+local resources = { omp=1, appname="april-ann", host=HOSTNAME, port=2345 }
+-- Lines of shell script to be executed by SSH script before running worker
+local shell_lines = {}
+-- List of idle machines.
+local idle_machines = {}
+local num_remote_cores = 0
 
 local ssh,ssh_methods = class("parxe.engine.ssh")
 
@@ -33,23 +44,10 @@ function ssh:constructor()
   -- is used to  identify client connections in order to assert possible errors.
   self.TMPNAME  = os.tmpname()
   self.HASH     = self.TMPNAME:match("^.*lua_(.*)$")
-  self.HOSTNAME = common.hostname()
   local f = io.open(self.TMPNAME,"w")
   f:write("PARXE ssh engine\n")
   f:close()
   ---------------------------------------------------------------------------
-
-  -- List of available machines. If one machine has multiple cores, you should put
-  -- it several times in this list. By default the list is empty.
-  self.machines = {}
-  -- List of idle machines.
-  self.idle_machines = {}
-  self.num_remote_cores = 0
-
-  -- Value of resources for SSH configuration.
-  self.resources = { omp=1, appname="april-ann", host=self.HOSTNAME, port=2345 }
-  -- Lines of shell script to be executed by SSH script before running worker
-  self.shell_lines = {}
 
   ---------------------------------------------------------------------------
 
@@ -78,8 +76,8 @@ end
 
 function ssh_methods:init()
   if not self.server then
-    self.server_url = "tcp://*:%d"%{self.resources.port}
-    self.client_url = "tcp://%s:%d"%{self.resources.host,self.resources.port}
+    self.server_url = "tcp://*:%d"%{resources.port}
+    self.client_url = "tcp://%s:%d"%{resources.host,resources.port}
     self.server = assert( xe.socket(xe.NN_REP) )
     self.endpoint = assert( self.server:bind(self.server_url) )
   end
@@ -96,29 +94,29 @@ function ssh_methods:check_asserts(cmd)
 end
 
 function ssh_methods:acceptting_tasks()
-  assert(self.num_remote_cores>0, "SHH engine requires at least one core")
-  return #self.idle_machines > 0
+  assert(num_remote_cores>0, "SHH engine requires at least one core")
+  return #idle_machines > 0
 end
 
 -- Executes ssh passing it the worker script and resources
 -- configuration.
 function ssh_methods:execute(task, stdout, stderr)
-  local machine_key = assert( table.remove(self.idle_machines, 1) )
+  local machine_key = assert( table.remove(idle_machines, 1) )
   local tmp = config.tmp()
   local tmpname = "%s/PX_%s_%06d_%s"%{tmp,self.HASH,task.id,os.date("%Y%m%d%H%M%S")}
   task.machine = machine_key
   local command = {
     "source ~/.bashrc",
     "cd "..task.wd,
-    "export OMP_NUM_THREADS="..self.resources.omp,
+    "export OMP_NUM_THREADS="..resources.omp,
   }
-  for _,v in pairs(self.shell_lines) do table.insert(command, v) end
+  for _,v in pairs(shell_lines) do table.insert(command, v) end
   table.insert(command,
-               "if [[ -z %s ]]; then echo Impossible to expand appname; exit -1; fi"%{self.resources.appname})
+               "if [[ -z %s ]]; then echo Impossible to expand appname; exit -1; fi"%{resources.appname})
   table.insert(command,
                'nohup %s -l parxe.worker -e "RUN_WORKER([[%s]],[[%s]],%d)" > %s 2> %s < /dev/null &'%
-                 { self.resources.appname, self.client_url, self.HASH, task.id, stdout, stderr, })
-  local s = table.concat{ "ssh ", self.machines[machine_key],
+                 { resources.appname, self.client_url, self.HASH, task.id, stdout, stderr, })
+  local s = table.concat{ "ssh ", machines[machine_key],
                           " '",
                           table.concat(command, ";"),
                           "'" }
@@ -127,16 +125,16 @@ function ssh_methods:execute(task, stdout, stderr)
 end
 
 function ssh_methods:finished(task)
-  table.insert(self.idle_machines, task.machine)
+  table.insert(idle_machines, task.machine)
   task.machine = nil
 end
 
-function ssh_methods:get_max_tasks() return self.num_remote_cores end
+function ssh_methods:get_max_tasks() return num_remote_cores end
 
 -- configure SSH resources
 function ssh_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
-  self.resources[key] = value
+  resources[key] = value
   if key == "port" and self.server then
     fprintf(io.stderr, "Unable to change port after any task has been executed")
   end
@@ -144,7 +142,7 @@ end
 
 -- appends a new shell line which will be executed before running the worker
 function ssh_methods:append_shell_line(value)
-  table.insert(self.shell_lines, value)
+  table.insert(shell_lines, value)
 end
 
 -- adds a new machine given the login@host credential and the number of cores
@@ -158,10 +156,10 @@ function ssh_methods:add_machine(login_host, num_cores)
   num_cores = num_cores or n
   for i=1,num_cores do
     local machine_key = login_host.."_"..i
-    if not self.machines[machine_key] then
-      self.machines[machine_key] = login_host
-      table.insert(self.idle_machines, machine_key)
-      self.num_remote_cores = self.num_remote_cores + 1
+    if not machines[machine_key] then
+      machines[machine_key] = login_host
+      table.insert(idle_machines, machine_key)
+      num_remote_cores = num_remote_cores + 1
     end
   end
 end

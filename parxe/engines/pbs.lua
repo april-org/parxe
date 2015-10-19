@@ -19,10 +19,16 @@ local common   = require "parxe.common"
 local config   = require "parxe.config"
 local xe       = require "xemsg"
 
+local HOSTNAME = common.hostname()
 -- Table with all allowed resources for PBS configuration. They can be setup
 -- by means of set_resource method in pbs engine object.
-allowed_resources = { mem=true, q=true, name=true, omp=true, port=true,
-                      appname=true, host=true, properties = true }
+local allowed_resources = { mem=true, q=true, name=true, omp=true, port=true,
+                            appname=true, host=true, properties = true }
+-- Value of resources for PBS configuration.
+local resources = { appname="april-ann", host=HOSTNAME, port=1234, omp=1,
+                    mem="1g" }
+-- Lines of shell script to be executed by PBS script before running worker
+local shell_lines = {}
 
 local pbs,pbs_methods = class("parxe.engine.pbs")
 
@@ -34,18 +40,11 @@ function pbs:constructor()
   -- is used to  identify client connections in order to assert possible errors.
   self.TMPNAME  = os.tmpname()
   self.HASH     = self.TMPNAME:match("^.*lua_(.*)$")
-  self.HOSTNAME = common.hostname()
   local f = io.open(self.TMPNAME,"w")
   f:write("PARXE pbs engine\n")
   f:close()
   ---------------------------------------------------------------------------
   
-  -- Value of resources for PBS configuration.
-  self.resources = { appname="april-ann", host=self.HOSTNAME, port=1234, omp=1,
-                      mem="1g" }
-  -- Lines of shell script to be executed by PBS script before running worker
-  self.shell_lines = {}
-
   -----------------------------------------------------------------------
 
   -- Forward declaration of server socket and binded endpoint identifier, for
@@ -73,8 +72,8 @@ end
 
 function pbs_methods:init()
   if not self.server then
-    self.server_url = "tcp://*:%d"%{self.resources.port}
-    self.client_url = "tcp://%s:%d"%{self.resources.host,self.resources.port}
+    self.server_url = "tcp://*:%d"%{resources.port}
+    self.client_url = "tcp://%s:%d"%{resources.host,resources.port}
     self.server = assert( xe.socket(xe.NN_REP) )
     self.endpoint = assert( self.server:bind(self.server_url) )
   end
@@ -102,27 +101,27 @@ end
 -- enqueues the given task profile into PBS scheduler, and keeps the jobid into
 -- task table
 function pbs_methods:execute(task, stdout, stderr)
-  local qsub_in,qsub_out = assert( io.popen2("qsub -N %s"%{self.resources.name or "PARXE"}) )
+  local qsub_in,qsub_out = assert( io.popen2("qsub -N %s"%{resources.name or "PARXE"}) )
   qsub_in:write("#PBS -l nice=19\n")
-  qsub_in:write("#PBS -l nodes=1:ppn=%d%s,mem=%s\n"%{self.resources.omp,
-                                                     concat_properties(self.resources.properties),
-                                                     self.resources.mem})
-  if self.resources.q then qsub_in:write("#PBS -q %s\n"%{self.resources.q}) end
+  qsub_in:write("#PBS -l nodes=1:ppn=%d%s,mem=%s\n"%{resources.omp,
+                                                     concat_properties(resources.properties),
+                                                     resources.mem})
+  if resources.q then qsub_in:write("#PBS -q %s\n"%{resources.q}) end
   qsub_in:write("#PBS -m a\n")
   qsub_in:write("#PBS -o %s\n"%{stdout})
   qsub_in:write("#PBS -e %s\n"%{stderr})
-  for _,v in pairs(self.shell_lines) do qsub_in:write("%s\n"%{v}) end
+  for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
   qsub_in:write("cd %s\n"%{task.wd})
-  qsub_in:write("export OMP_NUM_THREADS=%d\n"%{self.resources.omp})
-  qsub_in:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{self.HOSTNAME})
+  qsub_in:write("export OMP_NUM_THREADS=%d\n"%{resources.omp})
+  qsub_in:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
   qsub_in:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
   qsub_in:write("echo \"# DATE:     $(date)\"\n")
-  qsub_in:write("echo \"# SERVER:   %s\"\n"%{self.resources.host})
-  qsub_in:write("echo \"# PORT:     %d\"\n"%{self.resources.port})
+  qsub_in:write("echo \"# SERVER:   %s\"\n"%{resources.host})
+  qsub_in:write("echo \"# PORT:     %d\"\n"%{resources.port})
   qsub_in:write("echo \"# HASH:     %s\"\n"%{self.HASH})
-  qsub_in:write("echo \"# APPNAME:  %s\"\n"%{self.resources.appname})
+  qsub_in:write("echo \"# APPNAME:  %s\"\n"%{resources.appname})
   qsub_in:write("%s -l parxe.worker -e \"RUN_WORKER('%s','%s',%d)\"\n"%{
-                self.resources.appname, self.client_url, self.HASH, task.id,
+                resources.appname, self.client_url, self.HASH, task.id,
   })
   qsub_in:close()
   local jobid = qsub_out:read("*l")
@@ -140,7 +139,7 @@ function pbs_methods:get_max_tasks() return math.huge end
 -- configure PBS resources for qsub script configuration
 function pbs_methods:set_resource(key, value)
   april_assert(allowed_resources[key], "Not allowed resources name %s", key)
-  self.resources[key] = value
+  resources[key] = value
   if key == "port" and self.server then
     fprintf(io.stderr, "Unable to change port after any task has been executed")
   end
@@ -148,7 +147,7 @@ end
 
 -- appends a new shell line which will be executed by qsub script
 function pbs_methods:append_shell_line(value)
-  table.insert(self.shell_lines, value)
+  table.insert(shell_lines, value)
 end
 
 ----------------------------------------------------------------------------
