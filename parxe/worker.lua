@@ -40,7 +40,7 @@ function RUN_WORKER(URL, HASH, ID)
   assert(id == ID)
   print("# TASKID: ", id)
   -- execute the task
-  local ok,result = xpcall(func,debug.traceback,table.unpack(args))
+  local ok,result = xpcall(func,debug.traceback,table.unpack(args,1,args.n))
   local err = nil
   if not ok then err,result=result,{} end
   -- request returning the task result

@@ -92,7 +92,7 @@ function seq_methods:execute(task, stdout, stderr)
   os.execute("cd "..task.wd)
   local func   = task.func
   local args   = task.args
-  local result = func(table.unpack(args))
+  local result = func(table.unpack(args,1,args.n))
   do
     local f = io.open(stdout, "w") f:close()
     local f = io.open(stderr, "w") f:close()
