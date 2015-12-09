@@ -110,8 +110,8 @@ function pbs_methods:execute(task, stdout, stderr)
   qsub_in:write("#PBS -m a\n")
   qsub_in:write("#PBS -o %s\n"%{stdout})
   qsub_in:write("#PBS -e %s\n"%{stderr})
-  for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
   qsub_in:write("cd %s\n"%{task.wd})
+  for _,v in pairs(shell_lines) do qsub_in:write("%s\n"%{v}) end
   qsub_in:write("export OMP_NUM_THREADS=%d\n"%{resources.omp})
   qsub_in:write("echo \"# SERVER_HOSTNAME: %s\"\n"%{HOSTNAME})
   qsub_in:write("echo \"# WORKER_HOSTNAME: $(hostname)\"\n")
