@@ -74,7 +74,7 @@ print(f)
 pprint(f:get())
 
 local g = px.run(function() return matrix(1024):linspace():sum() end)
-local h = px.future.conditioned(function(a,x) return a*x end, 2, g)
+local h = g:then(function(x,a) return a*x end, 2)
 local i = px.future.conditioned(function(a,x) return a*x end, 3, g)
 local f = px.future.conditioned(function(a,b,c) return a+b+c end, h, i, 20)
 print(f:get())
