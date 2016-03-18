@@ -290,7 +290,7 @@ function future.conditioned(func, ...)
   f.func = func
   f.args = table.pack(...)
   local f_tbl = {}
-  for i,v in pairs(f_tbl) do
+  for i,v in ipairs(f.args) do
     if class.is_a(v,future) then table.insert(f_tbl,v) end
   end
   f.data = future.all(f_tbl)
