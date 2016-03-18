@@ -147,6 +147,10 @@ function future_methods:abort()
   self._do_work_ = aborted_function
 end
 
+function future_methods:then(fun,...)
+  return future.conditioned(fun,self,...)
+end
+
 -- future metamethods, to allow perform operations with them
 
 class.extend_metamethod(future, "__add",
