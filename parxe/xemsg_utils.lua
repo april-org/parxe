@@ -34,7 +34,6 @@ local blacklist = table.invert{
   "load",
   "loadfile",
   "loadstring",
-  "math",
   "module",
   "newproxy",
   "os",
