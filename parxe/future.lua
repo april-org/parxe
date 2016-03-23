@@ -147,7 +147,7 @@ function future_methods:abort()
   self._do_work_ = aborted_function
 end
 
-function future_methods:then(fun,...)
+function future_methods:after(fun,...)
   return future.conditioned(fun,self,...)
 end
 
